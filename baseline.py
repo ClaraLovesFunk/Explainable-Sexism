@@ -74,3 +74,6 @@ def binary_baseline(df):
 if __name__ == '__main__':
     df = pd.read_csv('data/train_all_tasks.csv')
     binary_baseline(df)
+    """
+    This is file is no longer maintained in favour of the ipynb file
+    """
