@@ -1,8 +1,6 @@
-#test2
 import pandas as pd
 import numpy as np
 import evaluate
-import torch
 from sklearn.model_selection import train_test_split
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, TrainingArguments, Trainer
 from datasets import Dataset
@@ -42,7 +40,7 @@ class model:
         return self.metric.compute(predictions=predictions, references=labels, average="macro")
 
     def train(self):
-        X_train, X_eval, y_train, y_eval = train_test_split(self.df['text'], self.df['label'], test_size=0.1, random_state=42)
+        X_train, X_eval, y_train, y_eval = train_test_split(self.df['text'], self.df['label'], test_size=0.3, random_state=42)
         train_data = Dataset.from_dict({
             'text': X_train.values,
             'label': y_train.values
@@ -63,12 +61,15 @@ class model:
         result = trainer.train()
         return result
 
+
+
 def binary_baseline(df):
     df.drop(['rewire_id', 'label_category', 'label_vector'], axis=1, inplace=True)    
     df['label_sexist'].replace({'not sexist':0, 'sexist':1}, inplace=True)
     df.rename(columns={'label_sexist':'label'}, inplace=True)
     print(df.head(10))
-    obj = model(df, 2)
+    # change model for bassline here
+    obj = model(df, 2,model_id='roberta-base')
     result = obj.train()
     
 
