@@ -2,3 +2,5 @@ ckpts/
 data/
 starting_kit/
 saved_models/
+venv/
+.fuse*
