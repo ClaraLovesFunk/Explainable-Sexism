@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 import pandas as pd
@@ -74,7 +75,7 @@ if __name__ == "__main__":
     #print(res)
 
 
-    df = pd.read_csv('data/train_all_tasks.csv')
+    df = pd.read_csv('project/Explainable-Sexism/data/train_all_tasks.csv')
 
     label_map = {
             'none':0,
