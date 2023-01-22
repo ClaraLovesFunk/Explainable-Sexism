@@ -88,11 +88,12 @@ if __name__ == "__main__":
     df['label_category'].replace(label_map, inplace=True)
     df.rename(columns={'label_category':'label'}, inplace=True)
 
-    grouped_dfs = df.groupby(['label'])
-
-    for (_, df) in grouped_dfs:
-        X_train, X_val, Y_train, Y_val = train_test_split(df['text'], df['label'], test_size=0.2)
-        #datamodule  = ExpertDataModule(X)
-
+    for label in range(len(label_map)):
+        new_map = {i:0 for i in range(len(label_map))}
+        new_map[label] = 1
+        binary_df = df.copy(deep=True)
+        binary_df['label'].replace(new_map, inplace=True)
+        
+        X_train, X_test, Y_train, Y_test = train_test_split(df['text'], df['label'], test_size=0.2)
 
 
