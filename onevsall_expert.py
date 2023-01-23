@@ -5,8 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
+from torch.optim import AdamW
 from transformers import AutoModel, AutoTokenizer
-from transformers import AdamW, get_cosine_schedule_with_warmup
+from transformers import get_cosine_schedule_with_warmup
 
 class ExpertDataset(Dataset):
 
@@ -72,7 +73,10 @@ class ExpertClassifier(pl.LightningModule):
         super().__init__()
         self.config = config
         self.pretrained_model = AutoModel.from_pretrained(config['model_name'], return_dict = True)
-        self.hidden = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.pretrained_model.config.hidden_size)
+        self.hidden = torch.nn.Linear(
+                self.pretrained_model.config.hidden_size,
+                self.pretrained_model.config.hidden_size
+                )
         self.classifier = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.config['n_labels'])
         torch.nn.init.xavier_uniform_(self.classifier.weight)
         self.loss_func = nn.BCEWithLogitsLoss(reduction='mean')
