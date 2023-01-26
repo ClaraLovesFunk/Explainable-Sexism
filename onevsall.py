@@ -3,10 +3,11 @@ import torch
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
 from transformers import AutoModel
 from onevsall_expert import ExpertDataModule, ExpertClassifier
 
-def train_experts(df, isTrain=True):
+def train_experts(df, model_name, isTrain=True):
     expert_config = {}
     for label in range(len(label_map)):
         new_map = {i:0 for i in range(len(label_map))}
@@ -19,30 +20,45 @@ def train_experts(df, isTrain=True):
         dm.setup()
 
         expert_config = {
-            'model_name': "microsoft/deberta-large",
+            'model_name': model_name,
             'n_labels': 2,
             'batch_size': 128,
             'lr': 1.5e-6,
             'warmup': 0.2, 
             'train_size': len(dm.train_dataloader()),
             'weight_decay': 0.001,
-            'n_epochs': 1
+            'n_epochs': 10,
             }
         if not isTrain:
             return expert_config
         else:
             expert_model = ExpertClassifier(expert_config)
 
+            checkpoint_callback = ModelCheckpoint(
+                    dirpath="project/Explainable-Sexism/onevsall_models",
+                    save_top_k=1,
+                    monitor="val f1",
+                    filename=f"unbalanced_model_{label}",
+                    )
             trainer = pl.Trainer(
                     max_epochs=expert_config['n_epochs'],
                     accelerator='gpu',
                     devices=1,
-                    default_root_dir="project/Explainable-Sexism/"
+                    num_sanity_val_steps=15,
+                    default_root_dir="project/Explainable-Sexism/",
+                    callbacks=[checkpoint_callback],
                     )
             trainer.fit(expert_model, dm)
-            torch.save(expert_model.pretrained_model.state_dict(), "project/Explainable-Sexism/model.pt")
-            return expert_model
-        break
+
+
+            preds = trainer.predict(expert_model, dm)
+            print(preds)
+
+
+            torch.save(
+                  expert_model.state_dict(), 
+                  f"project/Explainable-Sexism/onevsall_models/unbalanced_model_{label}.pt"
+                  )
 
     return expert_config
 
@@ -60,23 +76,19 @@ if __name__ == "__main__":
     df['label_category'].replace(label_map, inplace=True)
     df.rename(columns={'label_category':'label'}, inplace=True)
 
-    expert_model = train_experts(df, isTrain=True)
-    expert_dict = expert_model.pretrained_model.state_dict()
-    expert = expert_dict['encoder.layer.23.output.dense.weight'].numpy()
-    
+    model_name = "microsoft/deberta-large"
+    expert_configs = train_experts(df, model_name, isTrain=True)
 
-    new_model = AutoModel.from_pretrained("microsoft/deberta-large", return_dict = True)
-    model_dict = new_model.state_dict() #new model keys
-
-    new_model.load_state_dict(torch.load("project/Explainable-Sexism/model.pt"))
-
-
-    pretrained_dict = torch.load("project/Explainable-Sexism/model.pt")
-
-    before = model_dict['encoder.layer.23.output.dense.weight'].numpy()
-    after = pretrained_dict['encoder.layer.23.output.dense.weight'].numpy()
-    print(np.array_equal(before, expert))
-    print(before == expert)
+#    new_model = AutoModel.from_pretrained("microsoft/deberta-large", return_dict = True)
+#    model_dict = new_model.state_dict() #new model keys
+#
+#    new_model.load_state_dict(torch.load("project/Explainable-Sexism/model.pt"))
+#
+#
+#    pretrained_dict = torch.load("project/Explainable-Sexism/model.pt")
+#
+#    before = model_dict['encoder.layer.23.output.dense.weight'].numpy()
+#    after = pretrained_dict['encoder.layer.23.output.dense.weight'].numpy()
     
 
 

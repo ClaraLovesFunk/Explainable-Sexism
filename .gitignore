@@ -3,3 +3,4 @@ data/
 starting_kit/
 saved_models/
 venv/
+lightning_logs/
