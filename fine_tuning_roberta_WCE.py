@@ -1,10 +1,10 @@
-%env TOKENIZERS_PARALLELISM=True
+#env TOKENIZERS_PARALLELISM=True ###### THE WARNING IT THREW IN IPYNB MAYBE ONLY CAME UP IN IPYNB
 
 #!nvidia-smi
 
-%%capture ##########    WHATS THAT??????
+# #%%capture ##########    WHATS THAT??????
 #!pip install transformers 
-!pip install pytorch-lightning
+#pip install pytorch-lightning ###### YOU CANT HAVE IT IN THE FILE
 
 import os
 import numpy as np
@@ -21,7 +21,7 @@ import torch.nn as nn
 import math
 from torchmetrics.functional.classification import auroc
 import torch.nn.functional as F 
-from torchmetrics.classification import F1Score
+from torchmetrics.classification import MulticlassF1Score
 
 model_name =  'GroNLP/hateBERT' #'distilroberta-base' 
 
@@ -177,7 +177,7 @@ class UCC_Comment_Classifier(pl.LightningModule):
     torch.nn.init.xavier_uniform_(self.classifier.weight) # makes quicker
     self.loss_func = nn.BCEWithLogitsLoss(reduction='mean') ####### WE JUST WANT CROSSENTROPY??????????
     self.dropout = nn.Dropout()
-    self.f1_func = F1Score(task='multiclass', average='macro')
+    self.f1_func = MulticlassF1Score(num_classes = self.config['n_labels']) #########task='multiclass', average='macro'
     
   def forward(self, input_ids, attention_mask, labels=None):
     # roberta layer
@@ -237,7 +237,7 @@ import torch.nn.functional as F
 
 config = {
     'model_name': model_name,
-    'n_labels': len(attributes),
+    'n_labels': len(attributes), ########l
     'batch_size': 1,                 ######## CHANGE
     'lr': 1.5e-6,
     'warmup': 0.2, 
@@ -254,7 +254,7 @@ input_ids = ucc_ds.__getitem__(idx)['input_ids']
 attention_mask = ucc_ds.__getitem__(idx)['attention_mask']
 labels = ucc_ds.__getitem__(idx)['labels']
 model.cpu()
-loss, output = model(input_ids.unsqueeze(dim=0), attention_mask.unsqueeze(dim=0), labels.unsqueeze(dim=0))
+loss, f1, output = model(input_ids.unsqueeze(dim=0), attention_mask.unsqueeze(dim=0), labels.unsqueeze(dim=0))
 print(labels.shape, output.shape, output)
 
 
@@ -269,12 +269,12 @@ model = UCC_Comment_Classifier(config)
 
 # trainer and fit
 trainer = pl.Trainer(max_epochs=config['n_epochs'], gpus=1, num_sanity_val_steps=50)
-#trainer.fit(model, ucc_data_module)
+trainer.fit(model, ucc_data_module)
 
 
 
-%load_ext tensorboard
-%tensorboard --logdir ./lightning_logs/
+#%load_ext tensorboard ######## OPEN ANOTHER TERMINAL
+#%tensorboard --logdir ./lightning_logs/
 
 
 
