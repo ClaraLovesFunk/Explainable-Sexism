@@ -16,23 +16,20 @@ import torch.nn.functional as F
 from torchmetrics.classification import MulticlassF1Score
 
 
-model_name =  'GroNLP/hateBERT' #'distilroberta-base' 
 
 
 
-
+# LOAD AND RESTRUCTURE DATA          ######### DON'T DO IT A SECOND TIME IN CLASSES THEN
 
 data_path = 'data/train_all_tasks.csv'
 data = pd.read_csv(data_path)
 
 # represent label_sexist in a seperate binary column
 data['sexist'] = np.where(data['label_sexist'] == 'sexist', 1, 0)
-
-########## MAKE CLEAN COLUMN HERE AND NOT IN DATASET MODULE
+data['non_sexist'] = np.where(data['label_sexist'] == 'sexist', 0, 1)
 
 # represent label_category in seperate binary columns
-labels = ['1. threats, plans to harm and incitement','2. derogation', '3. animosity','4. prejudiced discussions']     
-
+labels = ['1. threats, plans to harm and incitement','2. derogation', '3. animosity','4. prejudiced discussions']    ##### ADD NONE 
 for k in labels:
     data[k] = np.where(data['label_category'] == k, 1, 0)
 
@@ -40,25 +37,24 @@ attributes = labels ######## ATTRIBUTES SHOULD BE CALLED LABELS
 
 
 
+# DECIDE FOR MODEL, PREPROCESS DATA ACCORDINGLY AND LOAD IT
 
+model_name =  'GroNLP/hateBERT' #'distilroberta-base' 
 
-tokenizer = AutoTokenizer.from_pretrained(model_name) #,TOKENIZERS_PARALLELISM=True
+tokenizer = AutoTokenizer.from_pretrained(model_name) #############,TOKENIZERS_PARALLELISM=True
+
 ucc_ds = UCC_Dataset(X_train, tokenizer, attributes=attributes, sample = 3) 
 ucc_ds_val = UCC_Dataset(X_test, tokenizer, attributes=attributes) 
-
-
-
-
 
 ucc_data_module = UCC_Data_Module(model_name, X_train, X_test, attributes=attributes, batch_size=1) ######## ADDED CONFIG
 ucc_data_module.setup()
 ucc_data_module.train_dataloader()
-len(ucc_data_module.train_dataloader()) ###### NUMBER OF BATCHES IN OUR TRAIN DATASET
-len(X_train)
+#len(ucc_data_module.train_dataloader()) ###### NUMBER OF BATCHES IN OUR TRAIN DATASET
+#len(X_train)
 
 
 
-
+# SPECIFY AND TRAIN MODEL
 
 config = {
     'model_name': model_name,
@@ -73,30 +69,37 @@ config = {
 
 model = UCC_Comment_Classifier(config)
 
+idx=0 #######??????
+input_ids = ucc_ds.__getitem__(idx)['input_ids'] #######??????#######??????#######??????
+attention_mask = ucc_ds.__getitem__(idx)['attention_mask'] #######??????
+labels = ucc_ds.__getitem__(idx)['labels'] #######??????
+model.cpu() #######??????
 
-idx=0
-input_ids = ucc_ds.__getitem__(idx)['input_ids']
-attention_mask = ucc_ds.__getitem__(idx)['attention_mask']
-labels = ucc_ds.__getitem__(idx)['labels']
-model.cpu()
 loss, f1, output = model(input_ids.unsqueeze(dim=0), attention_mask.unsqueeze(dim=0), labels.unsqueeze(dim=0))
-print(labels.shape, output.shape, output)
+#print(labels.shape, output.shape, output)
 
-
-# TRAIN MODEL
-
-# datamodule
 ucc_data_module = UCC_Data_Module(model_name, X_train, X_test, attributes=attributes, batch_size=config['batch_size'])
 ucc_data_module.setup()
 
-# model
 model = UCC_Comment_Classifier(config)
 
-# trainer and fit
 trainer = pl.Trainer(max_epochs=config['n_epochs'], gpus=1, num_sanity_val_steps=50)
 trainer.fit(model, ucc_data_module)
 
 
+
+
+
+
+
+
+
+
+
+
+'''
+
+TEST
 
 #%load_ext tensorboard ######## OPEN ANOTHER TERMINAL
 #%tensorboard --logdir ./lightning_logs/
@@ -131,7 +134,7 @@ y_pred_int
 
 
 
-'''from sklearn import metrics
+from sklearn import metrics
 plt.figure(figsize=(15, 8))
 for i, attribute in enumerate(attributes):
   fpr, tpr, _ = metrics.roc_curve(
