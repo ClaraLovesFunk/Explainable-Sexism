@@ -64,6 +64,9 @@ class ExpertDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
 
+    def test_dataloader(self):
+        return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
+
     def predict_dataloader(self):
         return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
 
@@ -116,9 +119,16 @@ class ExpertClassifier(pl.LightningModule):
         self.log("val loss ", loss, prog_bar = True, logger=True)
         return {"val_loss": loss, "val f1":f1, "predictions":outputs, "labels": batch["labels"]}
     
+    def test_step(self, batch, batch_index):
+        loss, f1, outputs = self(**batch)
+        self.log("test f1", f1, prog_bar = True, logger=True)
+        self.log("test loss ", loss, prog_bar = True, logger=True)
+        return {"loss":loss, "test f1":f1, "predictions":outputs, "labels": batch["labels"]}
+
     def predict_step(self, batch, batch_index):
         _, _, outputs = self(**batch)
         return outputs
+
     
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.config['lr'], weight_decay=self.config['weight_decay'])
