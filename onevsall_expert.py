@@ -8,7 +8,8 @@ from torch.utils.data import Dataset, DataLoader
 from torch.optim import AdamW
 from transformers import AutoModel, AutoTokenizer
 from transformers import get_cosine_schedule_with_warmup
-from torchmetrics.classification import F1Score
+from torchmetrics.classification import F1Score, MulticlassF1Score
+from sklearn.metrics import f1_score
 
 class ExpertDataset(Dataset):
 
@@ -72,7 +73,6 @@ class ExpertDataModule(pl.LightningDataModule):
 
 
 class ExpertClassifier(pl.LightningModule):
-
     def __init__(self, config: dict):
         super().__init__()
         self.config = config
@@ -82,11 +82,13 @@ class ExpertClassifier(pl.LightningModule):
                 self.pretrained_model.config.hidden_size
                 )
         self.classifier = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.config['n_labels'])
+        self.soft = torch.nn.Softmax(dim=1)
+
         torch.nn.init.xavier_uniform_(self.classifier.weight)
         self.dropout = nn.Dropout()
 
         self.loss_func = nn.BCEWithLogitsLoss(reduction='mean')
-        self.f1_func = F1Score(task='binary', average='macro')
+        self.f1_func = MulticlassF1Score(num_classes=2)
         
     def forward(self, input_ids, attention_mask, labels=None):
         # roberta layer
@@ -98,13 +100,15 @@ class ExpertClassifier(pl.LightningModule):
         pooled_output = F.relu(pooled_output)
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
+        logits = self.soft(logits)
 
         # calculate loss and f1
         loss = 0
         f1 = 0
         if labels is not None:
-            loss = self.loss_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels']))
-            f1 = self.f1_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels']))
+            print(logits)
+            loss = self.loss_func(logits, labels)
+            f1 = self.f1_func(logits, labels)
         return loss, f1, logits
     
     def training_step(self, batch, batch_index):
@@ -137,4 +141,3 @@ class ExpertClassifier(pl.LightningModule):
         warmup_steps = math.floor(total_steps * self.config['warmup'])
         scheduler = get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps)
         return [optimizer],[scheduler]
-
