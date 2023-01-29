@@ -8,8 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.optim import AdamW
 from transformers import AutoModel, AutoTokenizer
 from transformers import get_cosine_schedule_with_warmup
-from torchmetrics.classification import F1Score, MulticlassF1Score
-from sklearn.metrics import f1_score
+from torchmetrics.classification import MulticlassF1Score
 
 class ExpertDataset(Dataset):
 
