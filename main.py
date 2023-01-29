@@ -1,4 +1,4 @@
-import os
+'''import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,35 +13,34 @@ import torch.nn as nn
 import math
 from torchmetrics.functional.classification import auroc
 import torch.nn.functional as F 
-from torchmetrics.classification import MulticlassF1Score
+from torchmetrics.classification import MulticlassF1Score'''
+from torch.utils.data import Dataset
 
+from EDA import *
+from experts_by_pretraining import UCC_Dataset, UCC_Comment_Classifier
 
-
-
-
-# LOAD AND RESTRUCTURE DATA          ######### DON'T DO IT A SECOND TIME IN CLASSES THEN
 
 data_path = 'data/train_all_tasks.csv'
-data = pd.read_csv(data_path)
-
-# represent label_sexist in a seperate binary column
-data['sexist'] = np.where(data['label_sexist'] == 'sexist', 1, 0)
-data['non_sexist'] = np.where(data['label_sexist'] == 'sexist', 0, 1)
-
-# represent label_category in seperate binary columns
-labels = ['1. threats, plans to harm and incitement','2. derogation', '3. animosity','4. prejudiced discussions']    ##### ADD NONE 
-for k in labels:
-    data[k] = np.where(data['label_category'] == k, 1, 0)
-
-attributes = labels ######## ATTRIBUTES SHOULD BE CALLED LABELS
-
-
-
-# DECIDE FOR MODEL, PREPROCESS DATA ACCORDINGLY AND LOAD IT
-
-model_name =  'GroNLP/hateBERT' #'distilroberta-base' 
-
+model_name =  'GroNLP/hateBERT' ####['GroNLP/hateBERT', 'distilroberta-base', 'microsoft/deberta-large', 'bert-base-cased'] ####### WHICH BERT ARCHITECTURE IS HATEBERT USING?????
 tokenizer = AutoTokenizer.from_pretrained(model_name) #############,TOKENIZERS_PARALLELISM=True
+
+if __name__ == "__main__":
+  data, attributes = load_arrange_data(data_path)
+  ucc_data_module = UCC_Data_Module(model_name, X_train, X_test, attributes=attributes, batch_size=1) ######## ADDED CONFIG
+  ucc_data_module.setup()
+   
+  
+
+
+
+
+
+
+#'''
+
+
+''' JUST FOR SHOWING HOW IT WORKS
+ucc_ds = UCC_Dataset(data, tokenizer, attributes=attributes, sample = 3)
 
 ucc_ds = UCC_Dataset(X_train, tokenizer, attributes=attributes, sample = 3) 
 ucc_ds_val = UCC_Dataset(X_test, tokenizer, attributes=attributes) 
@@ -51,6 +50,8 @@ ucc_data_module.setup()
 ucc_data_module.train_dataloader()
 #len(ucc_data_module.train_dataloader()) ###### NUMBER OF BATCHES IN OUR TRAIN DATASET
 #len(X_train)
+'''
+
 
 
 
@@ -89,15 +90,6 @@ trainer.fit(model, ucc_data_module)
 
 
 
-
-
-
-
-
-
-
-
-'''
 
 TEST
 
@@ -145,4 +137,6 @@ for i, attribute in enumerate(attributes):
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.legend(loc='lower right')
-plt.title('RoBERTa Trained on UCC Datatset - AUC ROC')'''
+plt.title('RoBERTa Trained on UCC Datatset - AUC ROC')
+
+'''
