@@ -15,7 +15,9 @@ from torchmetrics.functional.classification import auroc
 import torch.nn.functional as F 
 from torchmetrics.classification import MulticlassF1Score
 
-class UCC_Dataset(Dataset): ########## WHY DO WE NEED FANCY DATASET MODULE?
+
+
+class Expert_Dataset(Dataset): ########## WHY DO WE NEED FANCY DATASET MODULE?
 
   def __init__(self, data, tokenizer, attributes, max_token_len: int = 128, sample = None): ######## DEFINE HOW TO TRUNCATE SAMPLES,  THINK HOW MANY MAX TOKENS WE HAVE
     self.data = data
@@ -61,7 +63,7 @@ class UCC_Dataset(Dataset): ########## WHY DO WE NEED FANCY DATASET MODULE?
 
 
 
-class UCC_Data_Module(pl.LightningDataModule):
+class Expert_DataModule(pl.LightningDataModule):
 
   def __init__(self,model_name, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128): #model_name='roberta-base' ######ADDEDCONFIG
     super().__init__()
@@ -76,12 +78,12 @@ class UCC_Data_Module(pl.LightningDataModule):
 
   def setup(self, stage = None):
     if stage in (None, "fit"): 
-      self.train_dataset = UCC_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) ####### ADD SAMPLE PARAMETER
-      self.val_dataset = UCC_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) ###### REMOVE SAMPLE PARAMETER
+      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) ####### ADD SAMPLE PARAMETER
+      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) ###### REMOVE SAMPLE PARAMETER
     if stage == 'test':
-      self.test_dataset = UCC_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) 
+      self.test_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) 
     if stage == 'predict': ######### CAN WE DISTINGUISH BETWEEN PREDICT FOR VAL AND PREDICT FOR TEST????????????
-      self.val_dataset = UCC_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) 
+      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) 
 
   def train_dataloader(self): ####### HERE ITS NICELY SEPERATED IN TRAIN, VAL, TEST -- WHY DIDNT WE DO THAT ABOVE IN SETUP????????
     return DataLoader(self.train_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True) 
@@ -92,10 +94,13 @@ class UCC_Data_Module(pl.LightningDataModule):
   def predict_dataloader(self):
     return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
 
+  def test_dataloader(self):
+    return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
 
 
 
-class UCC_Comment_Classifier(pl.LightningModule):
+
+class Expert_Classifier(pl.LightningModule):
 
   def __init__(self, config: dict):
     super().__init__()
@@ -139,6 +144,12 @@ class UCC_Comment_Classifier(pl.LightningModule):
     self.log("val f1", f1, prog_bar = True, logger=True)
     self.log("val loss ", loss, prog_bar = True, logger=True)
     return {"val_loss": loss, "val f1":f1, "predictions":outputs, "labels": batch["labels"]}
+
+  def test_step(self, batch, batch_index):
+    loss, f1, outputs = self(**batch)
+    self.log("test f1", f1, prog_bar = True, logger=True)
+    self.log("test loss ", loss, prog_bar = True, logger=True)
+    return {"test_loss": loss, "test f1":f1, "predictions":outputs, "labels": batch["labels"]}
   
   def predict_step(self, batch, batch_index):
     _, _, outputs = self(**batch)
@@ -159,6 +170,3 @@ class UCC_Comment_Classifier(pl.LightningModule):
   #     losses.append(loss)
   #   avg_loss = torch.mean(torch.stack(losses))
   #   self.log("avg_val_loss", avg_loss)
-
-
-
