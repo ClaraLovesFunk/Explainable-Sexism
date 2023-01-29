@@ -19,7 +19,7 @@ def load_arrange_data(data_path):
       data[k] = np.where(data['label_category'] == k, 1, 0)
 
   # drop unnessecary columns
-  data.drop(['rewire_id', 'label_sexist', 'label_category','label_vector'], axis=1, inplace=True)    
+  data.drop(['rewire_id', 'label_sexist','label_vector'], axis=1, inplace=True)    
 
   attributes = labels        ######## ATTRIBUTES SHOULD BE CALLED LABELS
 

@@ -14,10 +14,13 @@ import math
 from torchmetrics.functional.classification import auroc
 import torch.nn.functional as F 
 from torchmetrics.classification import MulticlassF1Score'''
-from torch.utils.data import Dataset
+
+
+from transformers import AutoTokenizer
+from sklearn.model_selection import train_test_split
 
 from EDA import *
-from experts_by_pretraining import UCC_Dataset, UCC_Comment_Classifier
+from experts_by_pretraining import *#UCC_Dataset, UCC_Comment_Classifier
 
 
 data_path = 'data/train_all_tasks.csv'
@@ -26,9 +29,9 @@ tokenizer = AutoTokenizer.from_pretrained(model_name) #############,TOKENIZERS_P
 
 if __name__ == "__main__":
   data, attributes = load_arrange_data(data_path)
+  X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size=0.33, random_state=42)
   ucc_data_module = UCC_Data_Module(model_name, X_train, X_test, attributes=attributes, batch_size=1) ######## ADDED CONFIG
   ucc_data_module.setup()
-   
   
 
 
@@ -54,7 +57,7 @@ ucc_data_module.train_dataloader()
 
 
 
-
+'''
 # SPECIFY AND TRAIN MODEL
 
 config = {
