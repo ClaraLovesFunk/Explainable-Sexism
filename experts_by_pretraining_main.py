@@ -10,7 +10,7 @@ if __name__ == "__main__":
   model_path = 'experts_by_pretraining_models'
   model_dict = {
     'bert-base-uncased': 'BERT_base_uncased',
-    'GroNLP/hateBERT': 'hateBERT',
+    #'GroNLP/hateBERT': 'hateBERT', ###########
     #'roberta-large' : 'RoBERTa_large',
     #'microsoft/deberta-large': 'DeBERTa_large',
     }
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     data, attributes = load_arrange_data(data_path)
     X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size=0.01, random_state=0) ######### test_size 0.2
     
-    ucc_data_module = Expert_DataModule(model_id, X_train, X_test, attributes=attributes) ######## attributes
+    ucc_data_module = Expert_DataModule(model_id, X_train, X_test, attributes=attributes) ######## attributes #,sample_fit=3
     ucc_data_module.setup()
     
     config = {
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     trainer.fit(model, ucc_data_module)
     
     # test 
-    trainer.test(model, ucc_data_module)
+    #trainer.test(model, ucc_data_module) ###### HOW DID WE DEFINE GOLD LABELS?
 
     # save 
     torch.save(model.state_dict(),f'{model_path}/{model_name}.pt')

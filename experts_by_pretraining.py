@@ -17,9 +17,9 @@ from torchmetrics.classification import MulticlassF1Score
 
 
 
-class Expert_Dataset(Dataset): ########## WHY DO WE NEED FANCY DATASET MODULE?
+class Expert_Dataset(Dataset): 
 
-  def __init__(self, data, tokenizer, attributes, max_token_len: int = 128, sample = None): ######## DEFINE HOW TO TRUNCATE SAMPLES,  THINK HOW MANY MAX TOKENS WE HAVE
+  def __init__(self, data, tokenizer, attributes, max_token_len: int = 128, sample=2): ######### sample = None
     self.data = data
     self.tokenizer = tokenizer
     self.attributes = attributes
@@ -28,18 +28,16 @@ class Expert_Dataset(Dataset): ########## WHY DO WE NEED FANCY DATASET MODULE?
     self._prepare_data()
 
   def _prepare_data(self): 
-    #data = pd.read_csv(self.data_path)
-    #data['sexist'] = np.where(data['label_sexist'] == 'sexist', 1, 0)
-    #labels = ['none','1. threats, plans to harm and incitement','2. derogation', '3. animosity','4. prejudiced discussions'] ##### TURN THIS into an input variable of the function!!!
-    #for k in labels:
-    #  data[k] = np.where(train_data['label_category'] == k, 1, 0)
 
-    if self.sample is not None:                            
-      sexist = data.loc[data['sexist']==1]
-      clean = data.loc[data['sexist']==0]
-      self.data = pd.concat([sexist.sample(self.sample, random_state=7), clean.sample(self.sample, random_state=7)])
-    #else:
-    #  self.data = data
+    if self.sample is not None:                          
+
+      label_none = data.loc[data['None']==1]
+      label_derogation = data.loc[data['1. threats, plans to harm and incitement']==1] ####### MAKE NICER LOOP
+      label_animosity = data.loc[data['2. derogation']==1]
+      label_threats = data.loc[data['3. animosity']==1]
+      label_prejudice = data.loc[data['4. prejudiced discussions']==1]
+
+      self.data = pd.concat([label_none.sample(self.sample, random_state=0), label_derogation.sample(self.sample, random_state=0), label_animosity.sample(self.sample, random_state=0), label_threats.sample(self.sample, random_state=0), label_prejudice.sample(self.sample, random_state=0)])
     
   def __len__(self): 
     return len(self.data)
@@ -65,28 +63,28 @@ class Expert_Dataset(Dataset): ########## WHY DO WE NEED FANCY DATASET MODULE?
 
 class Expert_DataModule(pl.LightningDataModule):
 
-  def __init__(self,model_name, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128): #model_name='roberta-base' ######ADDEDCONFIG
-    super().__init__()
-    #self.config = config   ####### ADDED BY ME         
+  def __init__(self, model_name, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128): ###### ADDED THIS sample    
+    super().__init__()        
     self.X_train = X_train
     self.X_test = X_test
     self.attributes = attributes
     self.batch_size = batch_size
     self.max_token_length = max_token_length
     self.model_name = model_name
-    self.tokenizer = AutoTokenizer.from_pretrained(model_name) #model_name
+    self.tokenizer = AutoTokenizer.from_pretrained(model_name) 
+    #self.sample = sample ###### ADDED THIS sample_fit = None
 
-  def setup(self, stage = None):
+  def setup(self, stage = None): 
     if stage in (None, "fit"): 
-      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) ####### ADD SAMPLE PARAMETER
-      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) ###### REMOVE SAMPLE PARAMETER
+      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) ##### WE DONT NEED TO SAMPLE ANYMORE IF WE DID IN DATASET, RIGHT?
+      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) 
     if stage == 'test':
       self.test_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) 
-    if stage == 'predict': ######### CAN WE DISTINGUISH BETWEEN PREDICT FOR VAL AND PREDICT FOR TEST????????????
+    if stage == 'predict': ######### WHATAS THE DIFFERENCE BETWEEN VAL IN FIT, AND TEST AND PREDICT?
       self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) 
 
-  def train_dataloader(self): ####### HERE ITS NICELY SEPERATED IN TRAIN, VAL, TEST -- WHY DIDNT WE DO THAT ABOVE IN SETUP????????
-    return DataLoader(self.train_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True) 
+  def train_dataloader(self): 
+    return DataLoader(self.train_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True) # WHY SHUFFEL TRUE HERE? AND SHOULDNT WE HAVE A SEED FOR IT THEN?, WHATS NUM_WORKERS?
 
   def val_dataloader(self):
     return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
@@ -109,12 +107,12 @@ class Expert_Classifier(pl.LightningModule):
     self.hidden = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.pretrained_model.config.hidden_size)
     self.classifier = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.config['n_labels'])
     self.soft = torch.nn.Softmax(dim=1)
-    torch.nn.init.xavier_uniform_(self.classifier.weight) # makes quicker
+    torch.nn.init.xavier_uniform_(self.classifier.weight) 
     self.loss_func = nn.BCEWithLogitsLoss(reduction='mean') ####### WE JUST WANT CROSSENTROPY??????????
     self.dropout = nn.Dropout()
-    self.f1_func = MulticlassF1Score(num_classes = self.config['n_labels']) #########task='multiclass', average='macro'
+    self.f1_func = MulticlassF1Score(num_classes = self.config['n_labels']) 
     
-  def forward(self, input_ids, attention_mask, labels=None):
+  def forward(self, input_ids, attention_mask, labels=None): ###### WHAT DOES LABELS = NONE MEAN
     # roberta layer
     output = self.pretrained_model(input_ids=input_ids, attention_mask=attention_mask)
     pooled_output = torch.mean(output.last_hidden_state, 1) 
@@ -129,8 +127,8 @@ class Expert_Classifier(pl.LightningModule):
     loss = 0
     f1 = 0
     if labels is not None:
-      loss = self.loss_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels'])) ##### WHY AND HOW DO WE NEED TO MAKE SURE THAT WHAT IS OF THE SAME SHAPE??? THE LOGITS?
-      f1 = self.f1_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels']))     ########self.f1_func(logits, labels)  
+      loss = self.loss_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels'])) 
+      f1 = self.f1_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels']))     ####### WHERE DO WE GET GOLD LABEL FROM 
     return loss, f1, logits
 
   def training_step(self, batch, batch_index):
@@ -162,11 +160,3 @@ class Expert_Classifier(pl.LightningModule):
     warmup_steps = math.floor(total_steps * self.config['warmup'])
     scheduler = get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps)
     return [optimizer],[scheduler]
-
-  # def validation_epoch_end(self, outputs):
-  #   losses = []
-  #   for output in outputs:
-  #     loss = output['val_loss'].detach().cpu()
-  #     losses.append(loss)
-  #   avg_loss = torch.mean(torch.stack(losses))
-  #   self.log("avg_val_loss", avg_loss)
