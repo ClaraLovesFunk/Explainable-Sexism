@@ -76,7 +76,7 @@ class Expert_DataModule(pl.LightningDataModule):
 
   def setup(self, stage = None): 
     if stage in (None, "fit"): 
-      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) 
+      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer, sample = 200)#, sample=self.sample) 
       self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) ## NO SAMPLING HERE 
     if stage == 'test':
       self.test_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) ## NO SAMPLING HERE 

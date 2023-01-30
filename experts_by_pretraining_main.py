@@ -12,8 +12,8 @@ if __name__ == "__main__":
   data_path = 'data/train_all_tasks.csv'
   model_path = 'experts_by_pretraining_models'
   model_dict = {
-    #'bert-base-uncased': 'BERT_base_uncased',
-    'GroNLP/hateBERT': 'hateBERT', 
+    'bert-base-uncased': 'BERT_base_uncased_bal',
+    'GroNLP/hateBERT': 'hateBERT_bal', 
     #'roberta-large' : 'RoBERTa_large'#,
     #'microsoft/deberta-large': 'DeBERTa_large',
     }
@@ -36,36 +36,30 @@ if __name__ == "__main__":
       'warmup': 0.2, 
       'train_size': len(ucc_data_module.train_dataloader()),
       'weight_decay': 0.001,
-      'n_epochs': 25     
+      'n_epochs': 10     
     }
 
     # define 
-    #model = Expert_Classifier(config)
+    model = Expert_Classifier(config)
     trainer = pl.Trainer(max_epochs=config['n_epochs'], gpus=1, num_sanity_val_steps=50)
     
     # train 
-    #trainer.fit(model, ucc_data_module)
+    trainer.fit(model, ucc_data_module)
 
     # save 
-    #torch.save(model.state_dict(),f'{model_path}/{model_name}.pt')
+    torch.save(model.state_dict(),f'{model_path}/{model_name}.pt')
     
     # reload
 
     model = Expert_Classifier(config)
-    model.load_state_dict(torch.load(f'{model_path}/{model_name}.pt'))
     model.eval()
-  
-    # test 
-    
-    #trainer.test(model, ucc_data_module) ###### HOW DID WE DEFINE GOLD LABELS?
-    
-    #predict
-    #y_pred = np.argmax(trainer.predict(model, ucc_data_module))
 
+
+
+
+    ####################### BEFORE TRAINING
     y_pred_tensor = trainer.predict(model, ucc_data_module)
-    #print(y_pred_tensor)
 
-    
     y_pred_arr = []
     for tensor in y_pred_tensor:
       y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
@@ -81,6 +75,33 @@ if __name__ == "__main__":
             }
     
     y_test.replace(label_map, inplace=True)
+    print(f'untrained {model_id}')
+    print(f'f1 score {f1_score(y_test, y_pred, average="macro")}')
+    print(f'accuracy {accuracy_score(y_test, y_pred)}')
+
+
+
+    ####################### AFTER TRAINING
+    model = Expert_Classifier(config)
+    model.load_state_dict(torch.load(f'{model_path}/{model_name}.pt'))
+    model.eval()
+  
+    # test 
+    
+    #trainer.test(model, ucc_data_module) ###### HOW DID WE DEFINE GOLD LABELS?
+    
+    #predict
+    #y_pred = np.argmax(trainer.predict(model, ucc_data_module))
+
+    y_pred_tensor = trainer.predict(model, ucc_data_module)
+
+    y_pred_arr = []
+    for tensor in y_pred_tensor:
+      y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
+    
+    y_pred = y_pred_arr
+
     print(f'trained {model_id}')
     print(f'f1 score {f1_score(y_test, y_pred, average="macro")}')
     print(f'accuracy {accuracy_score(y_test, y_pred)}')
+    print(f'unqiue values: {np.unique(y_pred)}')
