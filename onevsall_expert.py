@@ -1,6 +1,7 @@
 import math
 import torch
 import numpy as np
+import pandas as pd
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
@@ -12,14 +13,23 @@ from torchmetrics.classification import MulticlassF1Score
 
 class ExpertDataset(Dataset):
 
-    def __init__(self, df, tokenizer, max_token_len: int = 128, sample = 5000):
+    def __init__(self, df, tokenizer, max_token_len: int = 128, balance=False):
         self.data = df
         self.tokenizer = tokenizer
         self.max_token_len = max_token_len
-        self.sample = sample
+        self.balance = balance
         self._prepare_data()
 
     def _prepare_data(self):
+        if self.balance:
+            binary_class = self.data[self.data['label']==1]
+            binary_notClass = self.data[self.data['label']==0]
+            
+            if len(binary_class) > len(binary_notClass):
+                self.data = pd.concat([binary_notClass, binary_class.sample(len(binary_notClass), random_state=0)])
+            else: 
+                self.data = pd.concat([binary_class, binary_notClass.sample(len(binary_class), random_state=0)])
+
         self.data['class'] = np.where(self.data['label'] == 1, 1, 0)
         self.data['notClass'] = np.where(self.data['label'] == 0, 1, 0)
 
@@ -43,26 +53,27 @@ class ExpertDataset(Dataset):
 
 class ExpertDataModule(pl.LightningDataModule):
 
-    def __init__(self, train_df, val_df, batch_size: int = 16, max_token_length: int = 128,  model_name='roberta-base'):
+    def __init__(self, train_df, val_df, batch_size: int = 16, max_token_length: int = 128,  model_name='roberta-base', balance=False):
         super().__init__()
         self.train_df = train_df
         self.val_df = val_df
         self.batch_size = batch_size
         self.max_token_length = max_token_length
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.balance = balance
 
     def setup(self, stage = None):
         if stage in (None, "fit"):
-            self.train_dataset = ExpertDataset(self.train_df, tokenizer=self.tokenizer)
-            self.val_dataset = ExpertDataset(self.val_df, tokenizer=self.tokenizer, sample=None)
+            self.train_dataset = ExpertDataset(self.train_df, tokenizer=self.tokenizer, balance=self.balance)
+            self.val_dataset = ExpertDataset(self.val_df, tokenizer=self.tokenizer)
         if stage == 'predict':
-            self.val_dataset = ExpertDataset(self.val_df, tokenizer=self.tokenizer, sample=None)
+            self.val_dataset = ExpertDataset(self.val_df, tokenizer=self.tokenizer)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True)
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
+        return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True)
 
     def test_dataloader(self):
         return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
