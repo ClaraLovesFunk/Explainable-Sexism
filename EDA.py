@@ -14,7 +14,7 @@ def load_arrange_data(data_path):
   data['non_sexist'] = np.where(data['label_sexist'] == 'sexist', 0, 1) ####### UNNESSECARY, WE ONLY USE THIS FOR BALANCING BINARY CLASSES, BUT EVENTUALLY WE WANT TO BALANCE MULTIPLE CLASSES
 
   # represent label_category in seperate binary columns
-  labels = ['None','1. threats, plans to harm and incitement','2. derogation', '3. animosity','4. prejudiced discussions']    
+  labels = ['none','1. threats, plans to harm and incitement','2. derogation', '3. animosity','4. prejudiced discussions']    
   for k in labels:
       data[k] = np.where(data['label_category'] == k, 1, 0)
 
@@ -23,12 +23,13 @@ def load_arrange_data(data_path):
 
   attributes = labels        ######## ATTRIBUTES SHOULD BE CALLED LABELS
 
+  data[attributes].sum().plot.bar()
+
   return data, attributes
 
 
-
-def show_data(data):
-    display(data)
+#def show_data(data):
+#    display(data)
 
 
 

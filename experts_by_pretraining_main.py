@@ -10,8 +10,8 @@ if __name__ == "__main__":
   model_path = 'experts_by_pretraining_models'
   model_dict = {
     'bert-base-uncased': 'BERT_base_uncased',
-    #'GroNLP/hateBERT': 'hateBERT', ###########
-    #'roberta-large' : 'RoBERTa_large',
+    'GroNLP/hateBERT': 'hateBERT', 
+    'roberta-large' : 'RoBERTa_large'#,
     #'microsoft/deberta-large': 'DeBERTa_large',
     }
 
@@ -20,20 +20,20 @@ if __name__ == "__main__":
     model_name = model_dict[model_id]
 
     data, attributes = load_arrange_data(data_path)
-    X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size=0.01, random_state=0) ######### test_size 0.2
+    X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size=0.2, random_state=0) 
     
-    ucc_data_module = Expert_DataModule(model_id, X_train, X_test, attributes=attributes) ######## attributes #,sample_fit=3
+    ucc_data_module = Expert_DataModule(model_id, X_train, X_test, attributes=attributes) ##### ADD SAMPLIGN PARAMETER HERE, IF NOT NONE AND ADD TO DATAMODULE
     ucc_data_module.setup()
     
     config = {
       'model_name': model_id,
-      'n_labels': len(attributes), ########l
-      'batch_size': 1,                 ######## CHANGE
+      'n_labels': len(attributes), 
+      'batch_size': 2,                 
       'lr': 1.5e-6,
       'warmup': 0.2, 
       'train_size': len(ucc_data_module.train_dataloader()),
       'weight_decay': 0.001,
-      'n_epochs': 1      ###########25     
+      'n_epochs': 25     
     }
 
     # define 
@@ -42,13 +42,13 @@ if __name__ == "__main__":
     
     # train 
     trainer.fit(model, ucc_data_module)
-    
-    # test 
-    #trainer.test(model, ucc_data_module) ###### HOW DID WE DEFINE GOLD LABELS?
 
     # save 
     torch.save(model.state_dict(),f'{model_path}/{model_name}.pt')
     
     # reload
-    model = Expert_Classifier(config)
-    model.load_state_dict(torch.load(f'{model_path}/{model_name}.pt'))
+    #model = Expert_Classifier(config)
+    #model.load_state_dict(torch.load(f'{model_path}/{model_name}.pt'))
+  
+    # test 
+    #trainer.test(model, ucc_data_module) ###### HOW DID WE DEFINE GOLD LABELS?

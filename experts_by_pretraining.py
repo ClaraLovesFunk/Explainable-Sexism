@@ -19,7 +19,7 @@ from torchmetrics.classification import MulticlassF1Score
 
 class Expert_Dataset(Dataset): 
 
-  def __init__(self, data, tokenizer, attributes, max_token_len: int = 128, sample=2): ######### sample = None
+  def __init__(self, data, tokenizer, attributes, max_token_len: int = 128, sample=None): 
     self.data = data
     self.tokenizer = tokenizer
     self.attributes = attributes
@@ -31,11 +31,11 @@ class Expert_Dataset(Dataset):
 
     if self.sample is not None:                          
 
-      label_none = data.loc[data['None']==1]
-      label_derogation = data.loc[data['1. threats, plans to harm and incitement']==1] ####### MAKE NICER LOOP
-      label_animosity = data.loc[data['2. derogation']==1]
-      label_threats = data.loc[data['3. animosity']==1]
-      label_prejudice = data.loc[data['4. prejudiced discussions']==1]
+      label_none = self.data.loc[self.data['none']==1] ##### CONNECT WITH ATTRIBUTES FROM EDA
+      label_derogation = self.data.loc[self.data['1. threats, plans to harm and incitement']==1] ####### MAKE NICER LOOP
+      label_animosity = self.data.loc[self.data['2. derogation']==1]
+      label_threats = self.data.loc[self.data['3. animosity']==1]
+      label_prejudice = self.data.loc[self.data['4. prejudiced discussions']==1]
 
       self.data = pd.concat([label_none.sample(self.sample, random_state=0), label_derogation.sample(self.sample, random_state=0), label_animosity.sample(self.sample, random_state=0), label_threats.sample(self.sample, random_state=0), label_prejudice.sample(self.sample, random_state=0)])
     
@@ -63,7 +63,7 @@ class Expert_Dataset(Dataset):
 
 class Expert_DataModule(pl.LightningDataModule):
 
-  def __init__(self, model_name, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128): ###### ADDED THIS sample    
+  def __init__(self, model_name, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128):     
     super().__init__()        
     self.X_train = X_train
     self.X_test = X_test
@@ -76,12 +76,12 @@ class Expert_DataModule(pl.LightningDataModule):
 
   def setup(self, stage = None): 
     if stage in (None, "fit"): 
-      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) ##### WE DONT NEED TO SAMPLE ANYMORE IF WE DID IN DATASET, RIGHT?
-      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) 
+      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) 
+      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) ## NO SAMPLING HERE 
     if stage == 'test':
-      self.test_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) 
+      self.test_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) ## NO SAMPLING HERE 
     if stage == 'predict': ######### WHATAS THE DIFFERENCE BETWEEN VAL IN FIT, AND TEST AND PREDICT?
-      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer, sample=None) 
+      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) ## NO SAMPLING HERE 
 
   def train_dataloader(self): 
     return DataLoader(self.train_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True) # WHY SHUFFEL TRUE HERE? AND SHOULDNT WE HAVE A SEED FOR IT THEN?, WHATS NUM_WORKERS?
