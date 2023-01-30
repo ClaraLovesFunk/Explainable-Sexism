@@ -6,7 +6,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from onevsall_expert import ExpertDataModule, ExpertClassifier
 
 def train_experts(df, model_name, doTrain=False, doTest=False):
-    expert_config = {}
+    expert_configs = []
     expert_models = []
     for label in range(len(label_map)):
         new_map = {i:0 for i in range(len(label_map))}
@@ -28,6 +28,8 @@ def train_experts(df, model_name, doTrain=False, doTest=False):
             'weight_decay': 0.001,
             'n_epochs': 1,
             }
+
+        expert_configs.append(expert_config)
 
         expert_model = ExpertClassifier(expert_config)
         
@@ -57,15 +59,10 @@ def train_experts(df, model_name, doTrain=False, doTest=False):
             trainer.fit(expert_model, dm)
 
         if doTest:
+            expert_model.eval()
             trainer.test(expert_model, dm)
 
-            #torch.save(
-            #      expert_model.state_dict(), 
-            #      f"project/Explainable-Sexism/onevsall_models/unbalanced_model_{label}.pt"
-            #      )
-
-
-    return expert_models
+    return expert_models, expert_configs
 
 if __name__ == "__main__":
     df = pd.read_csv('project/Explainable-Sexism/data/train_all_tasks.csv')
@@ -83,21 +80,23 @@ if __name__ == "__main__":
 
     model_name = "microsoft/deberta-large"
 
-    experts = train_experts(df, model_name, doTrain=False, doTest=True)
+    full_experts, configs = train_experts(df, model_name, doTrain=False, doTest=False)
 
+    experts = [ExpertClassifier(config) for config in configs]
 
-#    new_model = AutoModel.from_pretrained("microsoft/deberta-large", return_dict = True)
-#    model_dict = new_model.state_dict() #new model keys
-#
-#    new_model.load_state_dict(torch.load("project/Explainable-Sexism/model.pt"))
-#
-#
-#    pretrained_dict = torch.load("project/Explainable-Sexism/model.pt")
-#
-#    before = model_dict['encoder.layer.23.output.dense.weight'].numpy()
-#    after = pretrained_dict['encoder.layer.23.output.dense.weight'].numpy()
-    
-
+    for i in range(len(label_map)):
+        finetuned_dict = full_experts[i].state_dict()
+        model_dict = experts[i].state_dict()
+        
+        # 1. filter out unnecessary keys
+        finetuned_dict = {k: v for k, v in finetuned_dict.items() if k in model_dict}
+        # 2. overwrite entries in the existing state dict
+        model_dict.update(finetuned_dict) 
+        # 3. load the new state dict
+        experts[i].load_state_dict(model_dict)
+        # freeze the weights for the master model
+        experts[i].eval()
+        
 
 
 
