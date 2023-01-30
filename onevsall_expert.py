@@ -92,6 +92,7 @@ class ExpertClassifier(pl.LightningModule):
     def forward(self, input_ids, attention_mask, labels=None):
         # roberta layer
         output = self.pretrained_model(input_ids=input_ids, attention_mask=attention_mask)
+
         pooled_output = torch.mean(output.last_hidden_state, 1)
         # final logits
         pooled_output = self.dropout(pooled_output)
@@ -105,7 +106,6 @@ class ExpertClassifier(pl.LightningModule):
         loss = 0
         f1 = 0
         if labels is not None:
-            print(logits)
             loss = self.loss_func(logits, labels)
             f1 = self.f1_func(logits, labels)
         return loss, f1, logits

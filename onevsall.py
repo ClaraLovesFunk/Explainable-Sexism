@@ -47,7 +47,11 @@ def train_experts(df, model_name, doTrain=False, doTest=False):
                 )
 
         if not doTrain:
-            pass
+            ckpt = torch.load(
+                  f"project/Explainable-Sexism/onevsall_models/unbalanced_model_{label}.ckpt"
+                    )
+            expert_model.load_state_dict(ckpt['state_dict'])
+            expert_models.append(expert_model)
         else:
             expert_models.append(expert_model)
             trainer.fit(expert_model, dm)
@@ -79,7 +83,7 @@ if __name__ == "__main__":
 
     model_name = "microsoft/deberta-large"
 
-    experts = train_experts(df, model_name, doTrain=True)
+    experts = train_experts(df, model_name, doTrain=False, doTest=True)
 
 
 #    new_model = AutoModel.from_pretrained("microsoft/deberta-large", return_dict = True)
