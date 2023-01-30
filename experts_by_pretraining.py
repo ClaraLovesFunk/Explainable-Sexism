@@ -63,15 +63,15 @@ class Expert_Dataset(Dataset):
 
 class Expert_DataModule(pl.LightningDataModule):
 
-  def __init__(self, model_name, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128):     
+  def __init__(self, model_id, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128):     
     super().__init__()        
     self.X_train = X_train
     self.X_test = X_test
     self.attributes = attributes
     self.batch_size = batch_size
     self.max_token_length = max_token_length
-    self.model_name = model_name
-    self.tokenizer = AutoTokenizer.from_pretrained(model_name) 
+    self.model_id = model_id
+    self.tokenizer = AutoTokenizer.from_pretrained(model_id) 
     #self.sample = sample ###### ADDED THIS sample_fit = None
 
   def setup(self, stage = None): 
@@ -137,7 +137,7 @@ class Expert_Classifier(pl.LightningModule):
     self.log("train loss ", loss, prog_bar = True, logger=True)
     return {"loss":loss, "train f1":f1, "predictions":outputs, "labels": batch["labels"]}
   
-  def validation_step(self, batch, batch_index):
+  def validation_step(self, batch, batch_index):  ############ HOW COME ALL THE STEPS ARE THE SAME TRAIN, VAL, TEST, ?
     loss, f1, outputs = self(**batch)
     self.log("val f1", f1, prog_bar = True, logger=True)
     self.log("val loss ", loss, prog_bar = True, logger=True)

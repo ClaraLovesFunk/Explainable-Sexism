@@ -1,4 +1,3 @@
-
 import numpy as np
 import pandas as pd
 from IPython.display import display
@@ -23,7 +22,7 @@ def load_arrange_data(data_path):
 
   attributes = labels        ######## ATTRIBUTES SHOULD BE CALLED LABELS
 
-  data[attributes].sum().plot.bar()
+  #data[attributes].sum().plot.bar()
 
   return data, attributes
 
