@@ -11,39 +11,49 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 if __name__ == "__main__":
 
+  #######################################################################################
+  #####################################   FLAGS   #######################################
+  #######################################################################################
+  
+  train_flag = False
+
+  #######################################################################################
+  ############################   VALUES TO ITERATE OVER   ###############################
+  #######################################################################################
+
+  model_dict = {
+    'GroNLP/hateBERT': 'hateBERT', 
+    'bert-base-uncased': 'BERT_base_uncased',
+    }
+
+  #######################################################################################
+  #####################################   HYPS   ########################################
+  #######################################################################################
+
   data_path = 'data/train_all_tasks.csv'
   model_path = 'experts_by_pretraining_models'
 
-  # store dict model_dict determining which pretrained lm to use
-  model_dict = {
-    'bert-base-uncased': 'BERT_base_uncased',
-    'GroNLP/hateBERT': 'hateBERT', 
-    #'roberta-large' : 'RoBERTa_large'#,
-    #'microsoft/deberta-large': 'DeBERTa_large',
-    }
-  results = {}
+ 
+  #results = {}
 
-  # LOOPING THROUGH MODELS
   results_by_model = {}
   for model_id in model_dict:
     
-
-    # store variable bal determining whether training is class balanced or not
-    # DO FOR BALANCING VS. NOT BALANCING
     bal = [True, False]
     results_by_balancing = {}
     for b in bal:
       
-
+      # PREPARE DATA
       model_name = model_dict[model_id]
 
       data, attributes = load_arrange_data(data_path)
 
       X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
       
-      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) ##### ADD SAMPLIGN PARAMETER HERE, IF NOT NONE AND ADD TO DATAMODULE
+      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) 
       full_expert_dm.setup()
       
+      # PREPARE MODELS
       config = {
         'model_name': model_id,
         'n_labels': len(attributes), 
@@ -55,8 +65,7 @@ if __name__ == "__main__":
         'n_epochs': 20     
       }
 
-      # define 
-      full_expert = Expert_Classifier(config)
+      #full_expert = Expert_Classifier(config)
 
       checkpoint_callback = ModelCheckpoint(
         dirpath=model_path,
@@ -72,26 +81,24 @@ if __name__ == "__main__":
         callbacks=[checkpoint_callback]
         )
       
-      # train 
-      #trainer.fit(full_expert, full_expert_dm)
-
-      # save 
-      #torch.save(full_expert.state_dict(),f'{model_path}/{model_name}_bal_{b}.pt')
+      # TRAINING
+      if train_flag == True: 
+        full_expert = Expert_Classifier(config)
+        trainer.fit(full_expert, full_expert_dm)
+        torch.save(full_expert.state_dict(),f'{model_path}/{model_name}_bal_{b}.pt')
       
-      # reload
-      #full_expert = Expert_Classifier(config)
-      #full_expert.eval()
 
+      # TESTING
 
-
-      # DO FOR TRAINING VS. NO TRAINING
-      training = [True, False]
+      # test trained vs. untrained models
+      model_trained = [True, False]
       results_by_training = {}
-      for t in training:
+      for t in model_trained:
 
-        # if we want to test a trained model, load our trained model
-        if t == True:
-          full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}.pt'))
+        full_expert = Expert_Classifier(config)        ############### DOE WE NEED EVAL HERE ALSO????                  
+        
+        if t == True:                                                    
+          full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}_bal_{b}.pt'))
           full_expert.eval()
 
         # get predictions and turn to array
@@ -101,14 +108,42 @@ if __name__ == "__main__":
           y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
         y_pred = y_pred_arr
 
-        # store results
-        results_by_training[t] = [f1_score(y_test, y_pred, average="macro"), accuracy_score(y_test, y_pred)}']
+        # compute performance
+        perf_metrics = {
+          'f1': f1_score(y_test, y_pred, average="macro"),
+          'acc': accuracy_score(y_test, y_pred), 
+          }
 
-      results_by_balancing[b] = results_by_training[t]
-    results_by_model[model_dict[model_id]] = results_by_balancing[b]
-        #print(f'untrained {model_id}')
-        #print(f'f1 score {f1_score(y_test, y_pred, average="macro")}')
-        #print(f'accuracy {accuracy_score(y_test, y_pred)}') 
+        # store performance
+        results_by_training[t] = perf_metrics
+      results_by_balancing[b] = results_by_training
+    results_by_model[model_dict[model_id]] = results_by_balancing
+
+  np.save('results.npy', results_by_model) 
+
+  results = np.load('results.npy',allow_pickle='TRUE').item()
+  
+  for model_id in model_dict: 
+      bal = [True, False]
+      for b in bal:
+          model_trained = [True, False]
+          for t in model_trained:
+
+            print('-----------------------------------------------------------')
+            print('-----------------------------------------------------------')
+            print(f'{model_id}-{b}-{t}:')
+            print(results[model_dict[model_id]][b][t]['f1']) #f'f1: ', 
+            print(results[model_dict[model_id]][b][t]['acc']) #f'acc: ', 
+            print('\n')
+
+
+
+
+
+
+
+
+
 
 
 '''
