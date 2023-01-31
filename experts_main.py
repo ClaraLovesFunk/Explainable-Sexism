@@ -16,7 +16,6 @@ if __name__ == "__main__":
   #######################################################################################
   
   train_expert_flag = False
-  #test_expert_flag = True
 
   #######################################################################################
   ############################   VALUES TO ITERATE OVER   ###############################
@@ -24,19 +23,18 @@ if __name__ == "__main__":
 
   model_dict = {
     'GroNLP/hateBERT': 'hateBERT', 
-    'bert-base-uncased': 'BERT_base_uncased',
+    #'bert-base-uncased': 'BERT_base_uncased',
     }
-  use_trained_model = [True, False]
-  train_balanced = [True, False]
+  use_trained_model = [True] 
+  train_balanced = [True] 
 
   #######################################################################################
   #####################################   HYPS   ########################################
   #######################################################################################
 
   data_path = 'data/train_all_tasks.csv'
+  test_data_path = 'data/test_task_b_entries.csv'
   model_path = 'experts_by_pretraining_models'
-
- 
 
   results_by_fullExpert = {}
   for model_id in model_dict:
@@ -63,7 +61,7 @@ if __name__ == "__main__":
         'warmup': 0.2, 
         'train_size': len(full_expert_dm.train_dataloader()),
         'weight_decay': 0.001,
-        'n_epochs': 20     
+        'n_epochs': 10 #10     
       }
 
       checkpoint_callback = ModelCheckpoint(
@@ -106,7 +104,8 @@ if __name__ == "__main__":
           y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
         y_pred = y_pred_arr
 
-        # compute performance
+
+        '''# compute performance
         perf_metrics = {
           'f1': f1_score(y_test, y_pred, average="macro"),
           'acc': accuracy_score(y_test, y_pred), 
@@ -133,4 +132,20 @@ if __name__ == "__main__":
         print(f'bal-{b}_trained-{t}:')
         print(results[model_dict[model_id]][b][t]['f1']) #f'f1: ', 
         print(results[model_dict[model_id]][b][t]['acc']) #f'acc: ', 
-        print('\n')
+        print('\n')'''
+
+  # MAKE SEMEVAL SUBMISSION FILE
+  X_test['label_pred'] =  y_pred
+  X_test.drop(['text', 'label_sexist', 'label_category', 'label_vector'], inplace=True, axis=1)
+  X_test.drop(attributes, inplace=True, axis=1)
+  label_map = {                                  
+    1:'1. threats, plans to harm and incitement',
+    2:'2. derogation',
+    3:'3. animosity',
+    4:'4. prejudiced discussions'
+    }
+  X_test['label_pred'].replace(label_map, inplace=True) 
+
+  X_test.to_csv('data/test_task_b_entries_pred.csv',index=False)
+  pred = pd.read_csv('data/test_task_b_entries_pred.csv')
+  #display(pred)
