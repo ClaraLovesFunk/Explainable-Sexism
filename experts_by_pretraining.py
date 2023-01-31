@@ -143,20 +143,20 @@ class Expert_Classifier(pl.LightningModule):
 
   def training_step(self, batch, batch_index):
     loss, f1, outputs = self(**batch)
-    self.log("train f1 ", f1, prog_bar = True, logger=True)
-    self.log("train loss ", loss, prog_bar = True, logger=True)
+    self.log("train f1", f1, prog_bar = True, logger=True)
+    self.log("train loss", loss, prog_bar = True, logger=True)
     return {"loss":loss, "train f1":f1, "predictions":outputs, "labels": batch["labels"]}
   
   def validation_step(self, batch, batch_index):  ############ HOW COME ALL THE STEPS ARE THE SAME TRAIN, VAL, TEST, ?
     loss, f1, outputs = self(**batch)
     self.log("val f1", f1, prog_bar = True, logger=True)
-    self.log("val loss ", loss, prog_bar = True, logger=True)
+    self.log("val loss", loss, prog_bar = True, logger=True)
     return {"val_loss": loss, "val f1":f1, "predictions":outputs, "labels": batch["labels"]}
 
   def test_step(self, batch, batch_index):
     loss, f1, outputs = self(**batch)
     self.log("test f1", f1, prog_bar = True, logger=True)
-    self.log("test loss ", loss, prog_bar = True, logger=True)
+    self.log("test loss", loss, prog_bar = True, logger=True)
     return {"test_loss": loss, "test f1":f1, "predictions":outputs, "labels": batch["labels"]}
   
   def predict_step(self, batch, batch_index):

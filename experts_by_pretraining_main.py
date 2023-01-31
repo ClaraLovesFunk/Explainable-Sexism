@@ -4,6 +4,8 @@ from experts_by_pretraining import *
 from sklearn.metrics import f1_score
 import numpy as np
 from sklearn.metrics import accuracy_score
+from pytorch_lightning.callbacks import ModelCheckpoint
+
 
 
 
@@ -12,47 +14,65 @@ if __name__ == "__main__":
   data_path = 'data/train_all_tasks.csv'
   model_path = 'experts_by_pretraining_models'
   model_dict = {
-    'bert-base-uncased': 'BERT_base_uncased_bal',
-    'GroNLP/hateBERT': 'hateBERT_bal', 
+    'bert-base-uncased': 'BERT_base_uncased',
+    'GroNLP/hateBERT': 'hateBERT', 
     #'roberta-large' : 'RoBERTa_large'#,
     #'microsoft/deberta-large': 'DeBERTa_large',
     }
 
   for model_id in model_dict:
-
-    model_name = model_dict[model_id]
-
-    data, attributes = load_arrange_data(data_path)
-    X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size=0.2, random_state=0) 
     
-    full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample =True) ##### ADD SAMPLIGN PARAMETER HERE, IF NOT NONE AND ADD TO DATAMODULE
-    full_expert_dm.setup()
+    # store variable bal determining whether training is class balanced or not
+    bal = [True, False]
     
-    config = {
-      'model_name': model_id,
-      'n_labels': len(attributes), 
-      'batch_size': 2,                 
-      'lr': 1.5e-6,
-      'warmup': 0.2, 
-      'train_size': len(full_expert_dm.train_dataloader()),
-      'weight_decay': 0.001,
-      'n_epochs': 10     
-    }
+    for b in bal:
 
-    # define 
-    full_expert = Expert_Classifier(config)
-    trainer = pl.Trainer(max_epochs=config['n_epochs'], gpus=1, num_sanity_val_steps=50)
-    
-    # train 
-    trainer.fit(full_expert, full_expert_dm)
+      model_name = model_dict[model_id]
 
-    # save 
-    #torch.save(full_expert.state_dict(),f'{model_path}/{model_name}.pt')
-    
-    # reload
+      data, attributes = load_arrange_data(data_path)
 
-    #full_expert = Expert_Classifier(config)
-    #full_expert.eval()
+      X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
+      
+      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) ##### ADD SAMPLIGN PARAMETER HERE, IF NOT NONE AND ADD TO DATAMODULE
+      full_expert_dm.setup()
+      
+      config = {
+        'model_name': model_id,
+        'n_labels': len(attributes), 
+        'batch_size': 2,                 
+        'lr': 1.5e-6,
+        'warmup': 0.2, 
+        'train_size': len(full_expert_dm.train_dataloader()),
+        'weight_decay': 0.001,
+        'n_epochs': 20     
+      }
+
+      # define 
+      full_expert = Expert_Classifier(config)
+
+      checkpoint_callback = ModelCheckpoint(
+        dirpath=model_path,
+        save_top_k=1,
+        monitor="val loss",
+        filename=f'{model_name}_bal_{b}',
+        )
+
+      trainer = pl.Trainer(
+        max_epochs=config['n_epochs'], 
+        gpus=1, 
+        num_sanity_val_steps=50,
+        callbacks=[checkpoint_callback]
+        )
+      
+      # train 
+      trainer.fit(full_expert, full_expert_dm)
+
+      # save 
+      torch.save(full_expert.state_dict(),f'{model_path}/{model_name}_bal_{b}.pt')
+      
+      # reload
+      #full_expert = Expert_Classifier(config)
+      #full_expert.eval()
 
 
 '''
