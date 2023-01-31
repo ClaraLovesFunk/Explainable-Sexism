@@ -1,5 +1,6 @@
 import torch
 import pandas as pd
+import numpy as np
 import pytorch_lightning as pl
 from transformers import AutoModel
 from sklearn.model_selection import train_test_split
@@ -8,7 +9,7 @@ from onevsall_expert import ExpertDataModule, ExpertClassifier
 from onevsall_master import MasterDataModule, MasterClassifier
 
 
-def train_master(df, model_name, experts, num_classes=5, doTrain=False, doTest=False):
+def train_master(df, model_name, experts, num_classes=5, doTrain=False, doTest=False, doPredict=False, pred_df=None):
     save_dir = "project/Explainable-Sexism/onevsall_models"
     model_filename="master"
 
@@ -46,9 +47,10 @@ def train_master(df, model_name, experts, num_classes=5, doTrain=False, doTest=F
 
     if not doTrain:
         ckpt = torch.load(
-                  f"{save_dir}/{model_filename}.ckpt"
+                  f"{save_dir}/{model_filename}.pt"
                     )
-        model.load_state_dict(ckpt['state_dict'])
+        model.load_state_dict(ckpt)
+        # model.load_state_dict(ckpt['state_dict'])
     else:
         trainer.fit(model, dm)
         torch.save(
@@ -62,6 +64,7 @@ def train_master(df, model_name, experts, num_classes=5, doTrain=False, doTest=F
         trainer.test(model, dataloaders=test_dataloader)
 
     return model
+
 
 def train_experts(df, model_name, num_classes=5, doTrain=False, doTest=False):
     expert_configs = []
@@ -98,6 +101,14 @@ def train_experts(df, model_name, num_classes=5, doTrain=False, doTest=False):
                 monitor="val f1",
                 filename=model_filename
                 )
+        trainer = pl.Trainer(
+                max_epochs=expert_config['n_epochs'],
+                accelerator='gpu',
+                devices=1,
+                num_sanity_val_steps=15,
+                default_root_dir="project/Explainable-Sexism/",
+                callbacks=[checkpoint_callback],
+                )
 
         if not doTrain:
             ckpt = torch.load(
@@ -106,14 +117,6 @@ def train_experts(df, model_name, num_classes=5, doTrain=False, doTest=False):
             expert_model.load_state_dict(ckpt['state_dict'])
             expert_models.append(expert_model)
         else:
-            trainer = pl.Trainer(
-                max_epochs=expert_config['n_epochs'],
-                accelerator='gpu',
-                devices=1,
-                num_sanity_val_steps=15,
-                default_root_dir="project/Explainable-Sexism/",
-                callbacks=[checkpoint_callback],
-                )
             trainer.fit(expert_model, dm)
             torch.save(
                 expert_model.state_dict(),
@@ -127,6 +130,41 @@ def train_experts(df, model_name, num_classes=5, doTrain=False, doTest=False):
             trainer.test(expert_model, dataloaders=test_dataloader)
 
     return expert_models, expert_configs
+
+def get_preds(model, model_name, df_train, df_test):
+    df_copy = df_test.copy(deep=True)
+    df_copy.drop(['rewire_id'], axis=1, inplace=True)
+    dm = MasterDataModule(df_train, df_test, model_name=model_name)
+    dm.setup()
+    trainer = pl.Trainer(
+                max_epochs=1,
+                accelerator='gpu',
+                devices=1,
+                num_sanity_val_steps=15,
+                default_root_dir="project/Explainable-Sexism/",
+                )
+    model.eval()
+    test_dataloader = dm.predict_dataloader()
+    y_pred_tensor = trainer.predict(model, dataloaders=test_dataloader)
+    
+    label_map = {
+            0:'none',
+            1:'1. threats, plans to harm and incitement',
+            2:'2. derogation',
+            3:'3. animosity',
+            4:'4. prejudiced discussions'
+            }
+
+    y_pred = []
+    for tensor in y_pred_tensor:
+          y_pred.extend(np.argmax(tensor.numpy(), axis = 1))
+
+    print(np.unique(y_pred))
+    df_test.drop(['label'], axis=1, inplace=True)
+    df_test['label'] = y_pred
+    df_test['label'].replace(label_map, inplace=True)
+    return df_test
+    
 
 if __name__ == "__main__":
     df = pd.read_csv('project/Explainable-Sexism/data/train_all_tasks.csv')
@@ -162,7 +200,12 @@ if __name__ == "__main__":
         # freeze the weights for the master model
         experts[i].eval()
 
-    master = train_master(df, model_name, experts, doTrain=True, doTest=True)
+    master = train_master(df, model_name, experts, doTrain=False, doTest=False)
+    test1 = pd.read_csv('project/Explainable-Sexism/data/dev_task_b_entries.csv')
+    test1['label'] = np.zeros(len(test1))
+    df = get_preds(master, model_name, df, test1)
+    df.drop(['text', '0', '1', '2', '3', '4'], inplace=True, axis=1)
+    print(df.head())
         
 
 
