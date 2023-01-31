@@ -19,7 +19,7 @@ from torchmetrics.classification import MulticlassF1Score
 
 class Expert_Dataset(Dataset): 
 
-  def __init__(self, data, tokenizer, attributes, max_token_len: int = 128, sample=False): 
+  def __init__(self, data, tokenizer, attributes, max_token_len: int = 128, sample=None): 
     self.data = data
     self.tokenizer = tokenizer
     self.attributes = attributes
@@ -29,7 +29,7 @@ class Expert_Dataset(Dataset):
 
   def _prepare_data(self): 
 
-    if self.sample:                          
+    if self.sample is not None:                          
 
       label_none = self.data.loc[self.data['none']==1] ##### CONNECT WITH ATTRIBUTES FROM EDA
       label_derogation = self.data.loc[self.data['1. threats, plans to harm and incitement']==1] ####### MAKE NICER LOOP
@@ -37,17 +37,7 @@ class Expert_Dataset(Dataset):
       label_threats = self.data.loc[self.data['3. animosity']==1]
       label_prejudice = self.data.loc[self.data['4. prejudiced discussions']==1]
 
-      # figure out smallest class
-      class_sizes = [len(label_none), len(label_derogation), len(label_animosity), len(label_threats), len(label_prejudice)]
-      sample_size = min(class_sizes)
-
-      self.data = pd.concat([
-        label_none.sample(sample_size, random_state=0), 
-        label_derogation.sample(sample_size, random_state=0), 
-        label_animosity.sample(sample_size, random_state=0), 
-        label_threats.sample(sample_size, random_state=0), 
-        label_prejudice.sample(sample_size, random_state=0)
-        ])
+      self.data = pd.concat([label_none.sample(self.sample, random_state=0), label_derogation.sample(self.sample, random_state=0), label_animosity.sample(self.sample, random_state=0), label_threats.sample(self.sample, random_state=0), label_prejudice.sample(self.sample, random_state=0)])
     
   def __len__(self): 
     return len(self.data)
@@ -56,7 +46,7 @@ class Expert_Dataset(Dataset):
     item = self.data.iloc[index]
     comment = str(item.text)             
     attributes = torch.FloatTensor(item[self.attributes])
-    tokens = self.tokenizer.encode_plus(comment,
+    tokens = self.tokenizer.encode_plus(comment,  
                                         add_special_tokens=True,
                                         return_tensors='pt',
                                         truncation=True,
@@ -73,7 +63,7 @@ class Expert_Dataset(Dataset):
 
 class Expert_DataModule(pl.LightningDataModule):
 
-  def __init__(self, model_id, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128, sample=False):     
+  def __init__(self, model_id, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128):     ########## OUR MODEL NEEDS TO BE PASSED HERE AND ORIGINAL MODELS
     super().__init__()        
     self.X_train = X_train
     self.X_test = X_test
@@ -81,12 +71,12 @@ class Expert_DataModule(pl.LightningDataModule):
     self.batch_size = batch_size
     self.max_token_length = max_token_length
     self.model_id = model_id
-    self.tokenizer = AutoTokenizer.from_pretrained(model_id) 
-    self.sample = sample ###### ADDED THIS sample_fit = None
+    self.tokenizer = AutoTokenizer.from_pretrained(model_id) ########## TAKE FROM ORINIAL 
+    #self.sample = sample ###### ADDED THIS sample_fit = None
 
   def setup(self, stage = None): 
     if stage in (None, "fit"): 
-      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer, sample = self.sample)#, sample=self.sample) 
+      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer)#, sample = 200 
       self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) ## NO SAMPLING HERE 
     if stage == 'test':
       self.test_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) ## NO SAMPLING HERE 
@@ -108,13 +98,15 @@ class Expert_DataModule(pl.LightningDataModule):
 
 
 
-class Expert_Classifier(pl.LightningModule):
+class Master_Classifier(pl.LightningModule): ###### RENAME IN MAIN
 
   def __init__(self, config: dict):
     super().__init__()
     self.config = config
-    self.pretrained_model = AutoModel.from_pretrained(config['model_name'], return_dict = True)
-    self.hidden = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.pretrained_model.config.hidden_size)
+    self.expert1
+    self.expert2
+    self.pretrained_model = # load my model      AutoModel.from_pretrained(config['model_name'], return_dict = True) #########RENAME TO SELF.FINETUNED_MODEL1 #########HOW DO WE THROW THE LAST LAYER AWAY SO WE KEEP ONLY EMBEDDINGS?
+    self.hidden = torch.nn.Linear(self.expert1.config.hidden_size + self.expert2.config.hidden_size, self.pretrained_model.config.hidden_size) ######## CUSTAMIZE OUTPUT HIDDEN SIZE AS WELL AS IN LINE BELWO ######### WHERE IS hidden_size COMING FROM???????
     self.classifier = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.config['n_labels'])
     self.soft = torch.nn.Softmax(dim=1)
     torch.nn.init.xavier_uniform_(self.classifier.weight) 
@@ -124,7 +116,9 @@ class Expert_Classifier(pl.LightningModule):
     
   def forward(self, input_ids, attention_mask, labels=None):
     # roberta layer
-    output = self.pretrained_model(input_ids=input_ids, attention_mask=attention_mask) 
+    output1 = self.expert1(input_ids=input_ids, attention_mask=attention_mask) ################BEFORE 
+    output2 = self.expert1(input_ids=input_ids, attention_mask=attention_mask) ################BEFORE 
+    output = #torch.concat[output1,output2] OR STH LIKE THAT
     pooled_output = torch.mean(output.last_hidden_state, 1) 
     # final logits
     pooled_output = self.dropout(pooled_output)

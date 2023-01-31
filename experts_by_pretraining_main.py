@@ -25,8 +25,8 @@ if __name__ == "__main__":
     data, attributes = load_arrange_data(data_path)
     X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size=0.2, random_state=0) 
     
-    ucc_data_module = Expert_DataModule(model_id, X_train, X_test, attributes=attributes) ##### ADD SAMPLIGN PARAMETER HERE, IF NOT NONE AND ADD TO DATAMODULE
-    ucc_data_module.setup()
+    full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample =True) ##### ADD SAMPLIGN PARAMETER HERE, IF NOT NONE AND ADD TO DATAMODULE
+    full_expert_dm.setup()
     
     config = {
       'model_name': model_id,
@@ -34,31 +34,31 @@ if __name__ == "__main__":
       'batch_size': 2,                 
       'lr': 1.5e-6,
       'warmup': 0.2, 
-      'train_size': len(ucc_data_module.train_dataloader()),
+      'train_size': len(full_expert_dm.train_dataloader()),
       'weight_decay': 0.001,
       'n_epochs': 10     
     }
 
     # define 
-    model = Expert_Classifier(config)
+    full_expert = Expert_Classifier(config)
     trainer = pl.Trainer(max_epochs=config['n_epochs'], gpus=1, num_sanity_val_steps=50)
     
     # train 
-    trainer.fit(model, ucc_data_module)
+    trainer.fit(full_expert, full_expert_dm)
 
     # save 
-    torch.save(model.state_dict(),f'{model_path}/{model_name}.pt')
+    #torch.save(full_expert.state_dict(),f'{model_path}/{model_name}.pt')
     
     # reload
 
-    model = Expert_Classifier(config)
-    model.eval()
+    #full_expert = Expert_Classifier(config)
+    #full_expert.eval()
 
 
-
+'''
 
     ####################### BEFORE TRAINING
-    y_pred_tensor = trainer.predict(model, ucc_data_module)
+    y_pred_tensor = trainer.predict(full_expert, full_expert_dm)
 
     y_pred_arr = []
     for tensor in y_pred_tensor:
@@ -82,9 +82,9 @@ if __name__ == "__main__":
 
 
     ####################### AFTER TRAINING
-    model = Expert_Classifier(config)
-    model.load_state_dict(torch.load(f'{model_path}/{model_name}.pt'))
-    model.eval()
+    full_expert = Expert_Classifier(config)
+    full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}.pt'))
+    full_expert.eval()
   
     # test 
     
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     #predict
     #y_pred = np.argmax(trainer.predict(model, ucc_data_module))
 
-    y_pred_tensor = trainer.predict(model, ucc_data_module)
+    y_pred_tensor = trainer.predict(full_expert, full_expert_dm)
 
     y_pred_arr = []
     for tensor in y_pred_tensor:
@@ -105,3 +105,4 @@ if __name__ == "__main__":
     print(f'f1 score {f1_score(y_test, y_pred, average="macro")}')
     print(f'accuracy {accuracy_score(y_test, y_pred)}')
     print(f'unqiue values: {np.unique(y_pred)}')
+'''
