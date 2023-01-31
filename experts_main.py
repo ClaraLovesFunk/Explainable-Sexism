@@ -1,11 +1,10 @@
 from sklearn.model_selection import train_test_split 
 from EDA import *
-from experts_by_pretraining import *
+from experts_modules import *
 from sklearn.metrics import f1_score
 import numpy as np
 from sklearn.metrics import accuracy_score
 from pytorch_lightning.callbacks import ModelCheckpoint
-
 
 
 
@@ -25,6 +24,8 @@ if __name__ == "__main__":
     'GroNLP/hateBERT': 'hateBERT', 
     'bert-base-uncased': 'BERT_base_uncased',
     }
+  use_trained_model = [True, False]
+  train_balanced = [True, False]
 
   #######################################################################################
   #####################################   HYPS   ########################################
@@ -39,9 +40,8 @@ if __name__ == "__main__":
   results_by_model = {}
   for model_id in model_dict:
     
-    bal = [True, False]
     results_by_balancing = {}
-    for b in bal:
+    for b in train_balanced:
       
       # PREPARE DATA
       model_name = model_dict[model_id]
@@ -64,8 +64,6 @@ if __name__ == "__main__":
         'weight_decay': 0.001,
         'n_epochs': 20     
       }
-
-      #full_expert = Expert_Classifier(config)
 
       checkpoint_callback = ModelCheckpoint(
         dirpath=model_path,
@@ -91,9 +89,8 @@ if __name__ == "__main__":
       # TESTING
 
       # test trained vs. untrained models
-      model_trained = [True, False]
       results_by_training = {}
-      for t in model_trained:
+      for t in use_trained_model:
 
         full_expert = Expert_Classifier(config)        ############### DOE WE NEED EVAL HERE ALSO????                  
         
@@ -124,76 +121,15 @@ if __name__ == "__main__":
   results = np.load('results.npy',allow_pickle='TRUE').item()
   
   for model_id in model_dict: 
-      bal = [True, False]
-      for b in bal:
-          model_trained = [True, False]
-          for t in model_trained:
+    print('-----------------------------------------------------------')
+    print('-----------------------------------------------------------')
+    print(f'     {model_name}')
+    print(f'\n')
+    for b in train_balanced:
+      for t in use_trained_model:
 
-            print('-----------------------------------------------------------')
-            print('-----------------------------------------------------------')
-            print(f'{model_id}-{b}-{t}:')
-            print(results[model_dict[model_id]][b][t]['f1']) #f'f1: ', 
-            print(results[model_dict[model_id]][b][t]['acc']) #f'acc: ', 
-            print('\n')
-
-
-
-
-
-
-
-
-
-
-
-'''
-
-    ####################### BEFORE TRAINING
-    y_pred_tensor = trainer.predict(full_expert, full_expert_dm)
-
-    y_pred_arr = []
-    for tensor in y_pred_tensor:
-      y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
-    
-    y_pred = y_pred_arr
-
-    label_map = {
-            'none':0,
-            '1. threats, plans to harm and incitement' : 1,
-            '2. derogation': 2,
-            '3. animosity': 3,
-            '4. prejudiced discussions': 4
-            }
-    
-    y_test.replace(label_map, inplace=True)
-    print(f'untrained {model_id}')
-    print(f'f1 score {f1_score(y_test, y_pred, average="macro")}')
-    print(f'accuracy {accuracy_score(y_test, y_pred)}')
-
-
-
-    ####################### AFTER TRAINING
-    full_expert = Expert_Classifier(config)
-    full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}.pt'))
-    full_expert.eval()
-  
-    # test 
-    
-    #trainer.test(model, ucc_data_module) ###### HOW DID WE DEFINE GOLD LABELS?
-    
-    #predict
-    #y_pred = np.argmax(trainer.predict(model, ucc_data_module))
-
-    y_pred_tensor = trainer.predict(full_expert, full_expert_dm)
-
-    y_pred_arr = []
-    for tensor in y_pred_tensor:
-      y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
-    
-    y_pred = y_pred_arr
-
-    print(f'trained {model_id}')
-    print(f'f1 score {f1_score(y_test, y_pred, average="macro")}')
-    print(f'accuracy {accuracy_score(y_test, y_pred)}')
-    print(f'unqiue values: {np.unique(y_pred)}')
-'''
+        print('-----------------------------------------------------------')
+        print(f'bal-{b}_trained-{t}:')
+        print(results[model_dict[model_id]][b][t]['f1']) #f'f1: ', 
+        print(results[model_dict[model_id]][b][t]['acc']) #f'acc: ', 
+        print('\n')

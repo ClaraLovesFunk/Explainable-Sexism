@@ -1,8 +1,4 @@
-import os
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
@@ -11,7 +7,6 @@ from transformers import AutoTokenizer
 from transformers import AutoModel, AdamW, get_cosine_schedule_with_warmup
 import torch.nn as nn
 import math
-from torchmetrics.functional.classification import auroc
 import torch.nn.functional as F 
 from torchmetrics.classification import MulticlassF1Score
 
@@ -32,7 +27,7 @@ class Expert_Dataset(Dataset):
     if self.sample:                          
 
       label_none = self.data.loc[self.data['none']==1] ##### CONNECT WITH ATTRIBUTES FROM EDA
-      label_derogation = self.data.loc[self.data['1. threats, plans to harm and incitement']==1] ####### MAKE NICER LOOP
+      label_derogation = self.data.loc[self.data['1. threats, plans to harm and incitement']==1] 
       label_animosity = self.data.loc[self.data['2. derogation']==1]
       label_threats = self.data.loc[self.data['3. animosity']==1]
       label_prejudice = self.data.loc[self.data['4. prejudiced discussions']==1]
@@ -82,19 +77,19 @@ class Expert_DataModule(pl.LightningDataModule):
     self.max_token_length = max_token_length
     self.model_id = model_id
     self.tokenizer = AutoTokenizer.from_pretrained(model_id) 
-    self.sample = sample ###### ADDED THIS sample_fit = None
+    self.sample = sample 
 
   def setup(self, stage = None): 
     if stage in (None, "fit"): 
-      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer, sample = self.sample)#, sample=self.sample) 
-      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) ## NO SAMPLING HERE 
+      self.train_dataset = Expert_Dataset(self.X_train, attributes=self.attributes, tokenizer=self.tokenizer, sample = self.sample) 
+      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer) 
     if stage == 'test':
-      self.test_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) ## NO SAMPLING HERE 
-    if stage == 'predict': ######### WHATAS THE DIFFERENCE BETWEEN VAL IN FIT, AND TEST AND PREDICT?
-      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer)#, sample=self.sample) ## NO SAMPLING HERE 
+      self.test_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer) 
+    if stage == 'predict': 
+      self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer) 
 
   def train_dataloader(self): 
-    return DataLoader(self.train_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True) # WHY SHUFFEL TRUE HERE? AND SHOULDNT WE HAVE A SEED FOR IT THEN?, WHATS NUM_WORKERS?
+    return DataLoader(self.train_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True) # CAN WE SHUFFLE AND STILL USE SEED
 
   def val_dataloader(self):
     return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
@@ -138,7 +133,7 @@ class Expert_Classifier(pl.LightningModule):
     f1 = 0
     if labels is not None:
       loss = self.loss_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels'])) 
-      f1 = self.f1_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels']))     ####### WHERE DO WE GET GOLD LABEL FROM 
+      f1 = self.f1_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels']))      
     return loss, f1, logits
 
   def training_step(self, batch, batch_index):
@@ -147,7 +142,7 @@ class Expert_Classifier(pl.LightningModule):
     self.log("train loss", loss, prog_bar = True, logger=True)
     return {"loss":loss, "train f1":f1, "predictions":outputs, "labels": batch["labels"]}
   
-  def validation_step(self, batch, batch_index):  ############ HOW COME ALL THE STEPS ARE THE SAME TRAIN, VAL, TEST, ?
+  def validation_step(self, batch, batch_index):  
     loss, f1, outputs = self(**batch)
     self.log("val f1", f1, prog_bar = True, logger=True)
     self.log("val loss", loss, prog_bar = True, logger=True)
