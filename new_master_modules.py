@@ -108,7 +108,7 @@ class Master_Classifier(pl.LightningModule):
   def __init__(self, config: dict):
     super().__init__()
     self.config = config
-    self.pretrained_model = AutoModel.from_pretrained(config['model_name'], return_dict = True)
+    self.pretrained_model = AutoModel.from_pretrained(config['model_name'], return_dict = True) ######## DO TWO CONFIGS FOR BERT AND FOR HATEBERT
     self.hidden = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.pretrained_model.config.hidden_size)
     self.classifier = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.config['n_labels'])
     self.soft = torch.nn.Softmax(dim=1)

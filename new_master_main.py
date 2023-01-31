@@ -15,7 +15,11 @@ if __name__ == "__main__":
   #####################################   FLAGS   #######################################
   #######################################################################################
   
-  train_flag = False
+  train_master_flag = True
+  test_master_flag = True
+  
+  train_expert_flag = False
+  balance_classes = True
 
   #######################################################################################
   ############################   VALUES TO ITERATE OVER   ###############################
@@ -39,105 +43,78 @@ if __name__ == "__main__":
   #results_by_model = {}
   #for model_id in model_dict:
     
-    results_by_balancing = {}
-    for b in train_balanced:
-      
-      # PREPARE DATA
-      model_name = model_dict[model_id]
+  #results_by_balancing = {}
+  #for b in train_balanced:
+  
+  # PREPARE DATA
+  expert0_id = list(model_dict.keys())[0]
+  expert1_id = list(model_dict.keys())[1]
+  expert0_name = model_dict[expert0_id]
+  expert1_name = model_dict[expert1_id]
 
-      data, attributes = load_arrange_data(data_path)
+  data, attributes = load_arrange_data(data_path)
 
-      X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
-      
-      master_dm = Master_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) 
-      master_dm.setup()
-      
-      # PREPARE MODELS
-      config = {
-        'model_name': model_id,
-        'n_labels': len(attributes), 
-        'batch_size': 2,                 
-        'lr': 1.5e-6,
-        'warmup': 0.2, 
-        'train_size': len(master_dm.train_dataloader()),
-        'weight_decay': 0.001,
-        'n_epochs': 20     
+  X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
+  
+  master_dm = Master_DataModule(expert0_id, X_train, X_test, attributes=attributes, sample = balance_classes) ###### WE CAN USE THE SAME TOKENIZER FOR BERT AND HATEBERT?
+  master_dm.setup()
+  
+  # PREPARE MODELS
+  config = {
+    'model_name': expert0_id, 
+    'n_labels': len(attributes), 
+    'batch_size': 2,                 
+    'lr': 1.5e-6,
+    'warmup': 0.2, 
+    'train_size': len(master_dm.train_dataloader()),
+    'weight_decay': 0.001,
+    'n_epochs': 1          #######20     
+  }
+
+  checkpoint_callback = ModelCheckpoint(
+    dirpath=model_path,
+    save_top_k=1,
+    monitor="val loss",
+    filename=f'master',
+    )
+
+  trainer = pl.Trainer(
+    max_epochs=config['n_epochs'], 
+    gpus=1, 
+    num_sanity_val_steps=50,
+    callbacks=[checkpoint_callback]
+    )
+  
+  # TRAINING
+  if train_master_flag == True: 
+    master_clf = Master_Classifier(config)
+    trainer.fit(master_clf, master_dm)
+    torch.save(master_clf.state_dict(),f'{model_path}/master.pt')
+  
+
+  # TESTING
+  if test_master_flag == True:   
+    master_clf = Master_Classifier(config)                                                         
+    #master_clf.load_state_dict(torch.load('experts_by_pretraining_models/master.pt'))
+    master_clf.load_state_dict(torch.load(f'{model_path}/master.pt')) ######maybe master model was not
+    master_clf.eval()
+
+    # get predictions and turn to array
+    y_pred_tensor = trainer.predict(master_clf, master_dm)
+    y_pred_arr = []
+    for tensor in y_pred_tensor:
+      y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
+    y_pred = y_pred_arr
+
+    # compute performance
+    perf_metrics = {
+      'f1': f1_score(y_test, y_pred, average="macro"),
+      'acc': accuracy_score(y_test, y_pred), 
       }
 
-      checkpoint_callback = ModelCheckpoint(
-        dirpath=model_path,
-        save_top_k=1,
-        monitor="val loss",
-        filename=f'{model_name}_bal_{b}',
-        )
-
-      trainer = pl.Trainer(
-        max_epochs=config['n_epochs'], 
-        gpus=1, 
-        num_sanity_val_steps=50,
-        callbacks=[checkpoint_callback]
-        )
-      
-      # TRAINING
-      if train_flag == True: 
-        master_clf = Master_Classifier(config)
-        trainer.fit(master_clf, master_dm)
-        torch.save(master_clf.state_dict(),f'{model_path}/{model_name}_bal_{b}.pt')
-      
-
-      # TESTING
-
-      # test trained vs. untrained models
-      results_by_training = {}
-      for t in use_trained_model:
-
-        master_clf = Master_Classifier(config)        ############### DOE WE NEED EVAL HERE ALSO????                  
-        
-        if t == True:                                                    
-          master_clf.load_state_dict(torch.load(f'{model_path}/{model_name}_bal_{b}.pt'))
-          master_clf.eval()
-
-        # get predictions and turn to array
-        y_pred_tensor = trainer.predict(master_clf, master_dm)
-        y_pred_arr = []
-        for tensor in y_pred_tensor:
-          y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
-        y_pred = y_pred_arr
-
-        # compute performance
-        perf_metrics = {
-          'f1': f1_score(y_test, y_pred, average="macro"),
-          'acc': accuracy_score(y_test, y_pred), 
-          }
-
-
-
-
-
-
-
-
-
-
-        # store performance
-        results_by_training[t] = perf_metrics
-      results_by_balancing[b] = results_by_training
-    results_by_model[model_dict[model_id]] = results_by_balancing
-
-  np.save('results.npy', results_by_model) 
-
-  results = np.load('results.npy',allow_pickle='TRUE').item()
-  
-  for model_id in model_dict: 
+    np.save('results.npy', perf_metrics) 
+    results = np.load('results.npy',allow_pickle='TRUE').item()
     print('-----------------------------------------------------------')
     print('-----------------------------------------------------------')
-    print(f'     {model_name}')
-    print(f'\n')
-    for b in train_balanced:
-      for t in use_trained_model:
-
-        print('-----------------------------------------------------------')
-        print(f'bal-{b}_trained-{t}:')
-        print(results[model_dict[model_id]][b][t]['f1']) #f'f1: ', 
-        print(results[model_dict[model_id]][b][t]['acc']) #f'acc: ', 
-        print('\n')
+    print(f'f1: {results["f1"]}')
+    print(f'acc: {results["acc"]}')

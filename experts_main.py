@@ -15,7 +15,8 @@ if __name__ == "__main__":
   #####################################   FLAGS   #######################################
   #######################################################################################
   
-  train_flag = False
+  train_expert_flag = False
+  #test_expert_flag = True
 
   #######################################################################################
   ############################   VALUES TO ITERATE OVER   ###############################
@@ -37,7 +38,7 @@ if __name__ == "__main__":
 
  
 
-  results_by_model = {}
+  results_by_fullExpert = {}
   for model_id in model_dict:
     
     results_by_balancing = {}
@@ -80,7 +81,7 @@ if __name__ == "__main__":
         )
       
       # TRAINING
-      if train_flag == True: 
+      if train_expert_flag == True: 
         full_expert = Expert_Classifier(config)
         trainer.fit(full_expert, full_expert_dm)
         torch.save(full_expert.state_dict(),f'{model_path}/{model_name}_bal_{b}.pt')
@@ -114,9 +115,9 @@ if __name__ == "__main__":
         # store performance
         results_by_training[t] = perf_metrics
       results_by_balancing[b] = results_by_training
-    results_by_model[model_dict[model_id]] = results_by_balancing
+    results_by_fullExpert[model_dict[model_id]] = results_by_balancing
 
-  np.save('results.npy', results_by_model) 
+  np.save('results.npy', results_by_fullExpert) 
 
   results = np.load('results.npy',allow_pickle='TRUE').item()
   
