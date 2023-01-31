@@ -18,7 +18,17 @@ def load_arrange_data(data_path):
       data[k] = np.where(data['label_category'] == k, 1, 0)
 
   # drop unnessecary columns
-  data.drop(['rewire_id', 'label_sexist','label_vector'], axis=1, inplace=True)    
+  data.drop(['rewire_id', 'label_sexist','label_vector'], axis=1, inplace=True)   
+
+    # prepare y_test for scikit's f2
+  label_map = {                                  ######## ADDED FOR TESTING
+    'none':0,
+    '1. threats, plans to harm and incitement' : 1,
+    '2. derogation': 2,
+    '3. animosity': 3,
+    '4. prejudiced discussions': 4
+    }
+  data['label_category'].replace(label_map, inplace=True) 
 
   attributes = labels        ######## ATTRIBUTES SHOULD BE CALLED LABELS
 

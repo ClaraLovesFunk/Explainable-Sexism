@@ -13,19 +13,27 @@ if __name__ == "__main__":
 
   data_path = 'data/train_all_tasks.csv'
   model_path = 'experts_by_pretraining_models'
+
+  # store dict model_dict determining which pretrained lm to use
   model_dict = {
     'bert-base-uncased': 'BERT_base_uncased',
     'GroNLP/hateBERT': 'hateBERT', 
     #'roberta-large' : 'RoBERTa_large'#,
     #'microsoft/deberta-large': 'DeBERTa_large',
     }
+  results = {}
 
+  # LOOPING THROUGH MODELS
+  results_by_model = {}
   for model_id in model_dict:
     
+
     # store variable bal determining whether training is class balanced or not
+    # DO FOR BALANCING VS. NOT BALANCING
     bal = [True, False]
-    
+    results_by_balancing = {}
     for b in bal:
+      
 
       model_name = model_dict[model_id]
 
@@ -65,14 +73,42 @@ if __name__ == "__main__":
         )
       
       # train 
-      trainer.fit(full_expert, full_expert_dm)
+      #trainer.fit(full_expert, full_expert_dm)
 
       # save 
-      torch.save(full_expert.state_dict(),f'{model_path}/{model_name}_bal_{b}.pt')
+      #torch.save(full_expert.state_dict(),f'{model_path}/{model_name}_bal_{b}.pt')
       
       # reload
       #full_expert = Expert_Classifier(config)
       #full_expert.eval()
+
+
+
+      # DO FOR TRAINING VS. NO TRAINING
+      training = [True, False]
+      results_by_training = {}
+      for t in training:
+
+        # if we want to test a trained model, load our trained model
+        if t == True:
+          full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}.pt'))
+          full_expert.eval()
+
+        # get predictions and turn to array
+        y_pred_tensor = trainer.predict(full_expert, full_expert_dm)
+        y_pred_arr = []
+        for tensor in y_pred_tensor:
+          y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
+        y_pred = y_pred_arr
+
+        # store results
+        results_by_training[t] = [f1_score(y_test, y_pred, average="macro"), accuracy_score(y_test, y_pred)}']
+
+      results_by_balancing[b] = results_by_training[t]
+    results_by_model[model_dict[model_id]] = results_by_balancing[b]
+        #print(f'untrained {model_id}')
+        #print(f'f1 score {f1_score(y_test, y_pred, average="macro")}')
+        #print(f'accuracy {accuracy_score(y_test, y_pred)}') 
 
 
 '''
