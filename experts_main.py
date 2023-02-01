@@ -15,7 +15,7 @@ if __name__ == "__main__":
   #####################################   FLAGS   #######################################
   #######################################################################################
   
-  train_expert_flag = True
+  train_expert_flag = False
 
   #######################################################################################
   ############################   VALUES TO ITERATE OVER   ###############################
@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
       X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
       
-      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = train_balanced) #######REPLACE FALSE WITH B
+      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) 
       full_expert_dm.setup()
       
       # PREPARE MODELS
@@ -63,7 +63,7 @@ if __name__ == "__main__":
       }
 
       
-      checkpoint_callback = ModelCheckpoint(
+      '''checkpoint_callback = ModelCheckpoint(
         dirpath=model_path,
         save_top_k=1,
         monitor="val loss",
@@ -75,10 +75,14 @@ if __name__ == "__main__":
         gpus=1, 
         num_sanity_val_steps=50,
         callbacks=[checkpoint_callback]
-        )
+        )'''
+
+      
+      trainer = pl.Trainer()
       
       # TRAINING
       if train_expert_flag == True: 
+        
         full_expert = Expert_Classifier(config)
         trainer.fit(full_expert, full_expert_dm)
         torch.save(full_expert.state_dict(),f'{model_path}/{model_name}_bal_{b}.pt')
@@ -88,7 +92,10 @@ if __name__ == "__main__":
 
       full_expert = Expert_Classifier(config)  
       print(f'{model_path}/{model_name}_bal_{b}.pt')                                          
-      full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}_bal_{b}.pt'))
+      #full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}_bal_{b}.pt'))
+
+      full_expert.load_state_dict(torch.load('experts_by_pretraining_models/hateBERT_bal_True.pt'))
+      
       full_expert.eval()
 
       y_pred_tensor = trainer.predict(full_expert, full_expert_dm)
