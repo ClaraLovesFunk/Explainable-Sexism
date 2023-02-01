@@ -25,15 +25,13 @@ if __name__ == "__main__":
     'GroNLP/hateBERT': 'hateBERT', 
     #'bert-base-uncased': 'BERT_base_uncased',
     }
-  use_trained_model = [True] 
   train_balanced = [True]      ###################### CHANGE
 
   #######################################################################################
   #####################################   HYPS   ########################################
   #######################################################################################
 
-  data_path = 'data/test_task_b_entries.csv'#'data/train_all_tasks.csv'
-  test_data_path = 'data/test_task_b_entries.csv'
+  data_path = 'data/train_all_tasks.csv'
   model_path = 'experts_by_pretraining_models'
 
   results_by_fullExpert = {}
@@ -61,9 +59,10 @@ if __name__ == "__main__":
         'warmup': 0.2, 
         'train_size': len(full_expert_dm.train_dataloader()),
         'weight_decay': 0.001,
-        'n_epochs': 10 #10     
+        'n_epochs': 1 #10     
       }
 
+      
       checkpoint_callback = ModelCheckpoint(
         dirpath=model_path,
         save_top_k=1,
@@ -87,37 +86,24 @@ if __name__ == "__main__":
 
       # TESTING
 
-      # test trained vs. untrained models
-      results_by_training = {}
-      for t in use_trained_model:
+      full_expert = Expert_Classifier(config)                                            
+      full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}_bal_{b}.pt'))
+      full_expert.eval()
 
-        full_expert = Expert_Classifier(config)        ############### DOE WE NEED EVAL HERE ALSO????                  
-        
-        if t == True:                                                    
-          full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}_bal_{b}.pt'))
-          full_expert.eval()
+      y_pred_tensor = trainer.predict(full_expert, full_expert_dm)
+      y_pred_arr = []
+      for tensor in y_pred_tensor:
+        y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
+      y_pred = y_pred_arr
 
-        # get predictions and turn to array
-        y_pred_tensor = trainer.predict(full_expert, full_expert_dm)
-        y_pred_arr = []
-        for tensor in y_pred_tensor:
-          y_pred_arr.extend(np.argmax(tensor.numpy(), axis = 1))
-        y_pred = y_pred_arr
+      perf_metrics = {
+        'f1': f1_score(y_test, y_pred, average="macro"),
+        'acc': accuracy_score(y_test, y_pred), 
+        }
 
-
-        # compute performance
-        perf_metrics = {
-          'f1': f1_score(y_test, y_pred, average="macro"),
-          'acc': accuracy_score(y_test, y_pred), 
-          }
-
-        # store performance
-        results_by_training[t] = perf_metrics
-      results_by_balancing[b] = results_by_training
+      results_by_balancing[b] = perf_metrics
     results_by_fullExpert[model_dict[model_id]] = results_by_balancing
-
   np.save('results.npy', results_by_fullExpert) 
-
   results = np.load('results.npy',allow_pickle='TRUE').item()
   
   for model_id in model_dict: 
@@ -126,10 +112,8 @@ if __name__ == "__main__":
     print(f'     {model_name}')
     print(f'\n')
     for b in train_balanced:
-      for t in use_trained_model:
-
-        print('-----------------------------------------------------------')
-        print(f'bal-{b}_trained-{t}:')
-        print(results[model_dict[model_id]][b][t]['f1']) #f'f1: ', 
-        print(results[model_dict[model_id]][b][t]['acc']) #f'acc: ', 
-        print('\n')
+      print('-----------------------------------------------------------')
+      print(f'bal-{b}:')
+      print(results[model_dict[model_id]][b]['f1']) #f'f1: ', 
+      print(results[model_dict[model_id]][b]['acc']) #f'acc: ', 
+      print('\n')
