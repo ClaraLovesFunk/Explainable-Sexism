@@ -16,7 +16,6 @@ if __name__ == "__main__":
   #######################################################################################
   
   train_expert_flag = False
-  test_submission_flag = True
 
   #######################################################################################
   ############################   VALUES TO ITERATE OVER   ###############################
@@ -46,15 +45,9 @@ if __name__ == "__main__":
       # PREPARE DATA
       model_name = model_dict[model_id]
 
-      data, attributes = load_arrange_data(data_path,test_submission_flag)
+      data, attributes = load_arrange_data(data_path)
 
-      if test_submission_flag == True:
-        X_train = data
-        X_test = data
-        y_test = data['label_category']
-        y_train = data['label_category']
-      else:
-        X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
+      X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
       
       full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = False) #######REPLACE FALSE WITH B
       full_expert_dm.setup()
@@ -112,7 +105,7 @@ if __name__ == "__main__":
         y_pred = y_pred_arr
 
 
-        '''# compute performance
+        # compute performance
         perf_metrics = {
           'f1': f1_score(y_test, y_pred, average="macro"),
           'acc': accuracy_score(y_test, y_pred), 
@@ -139,27 +132,4 @@ if __name__ == "__main__":
         print(f'bal-{b}_trained-{t}:')
         print(results[model_dict[model_id]][b][t]['f1']) #f'f1: ', 
         print(results[model_dict[model_id]][b][t]['acc']) #f'acc: ', 
-        print('\n')'''
-
-  # MAKE SEMEVAL SUBMISSION FILE
-  
-  X_test['label_pred_int'] =  y_pred
-
-  label_map = {                                  
-    0: "1. threats, plans to harm and incitement",
-    1: "2. derogation",
-    2: "3. animosity",
-    3: "4. prejudiced discussions",
-    }
-  #X_test['label_pred'].replace(label_map, inplace=True) 
-  '''X_test['label_pred'] = X_test['rewire_id']
-  for x in range(len(X_test)):
-    for i in range(4):
-      X_test['label_pred'][x]=label_map[i]
-  '''
-  X_test.drop(['text', 'label_category'], inplace=True, axis=1) #, 'label_pred_int'
-  X_test.drop(attributes, inplace=True, axis=1)
-
-  X_test.to_csv('data/test_task_b_entries_pred.csv',index=False)
-  pred = pd.read_csv('data/test_task_b_entries_pred.csv')
-  #display(pred)
+        print('\n')
