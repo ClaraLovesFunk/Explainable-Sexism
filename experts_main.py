@@ -15,7 +15,7 @@ if __name__ == "__main__":
   #####################################   FLAGS   #######################################
   #######################################################################################
   
-  train_expert_flag = False
+  train_expert_flag = True
 
   #######################################################################################
   ############################   VALUES TO ITERATE OVER   ###############################
@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
       X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
       
-      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = False) #######REPLACE FALSE WITH B
+      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = train_balanced) #######REPLACE FALSE WITH B
       full_expert_dm.setup()
       
       # PREPARE MODELS
@@ -86,7 +86,8 @@ if __name__ == "__main__":
 
       # TESTING
 
-      full_expert = Expert_Classifier(config)                                            
+      full_expert = Expert_Classifier(config)  
+      print(f'{model_path}/{model_name}_bal_{b}.pt')                                          
       full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}_bal_{b}.pt'))
       full_expert.eval()
 
