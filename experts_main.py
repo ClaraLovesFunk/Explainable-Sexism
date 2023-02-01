@@ -16,6 +16,7 @@ if __name__ == "__main__":
   #######################################################################################
   
   train_expert_flag = False
+  test_submission_flag = True
 
   #######################################################################################
   ############################   VALUES TO ITERATE OVER   ###############################
@@ -26,13 +27,13 @@ if __name__ == "__main__":
     #'bert-base-uncased': 'BERT_base_uncased',
     }
   use_trained_model = [True] 
-  train_balanced = [True] 
+  train_balanced = [True]      ###################### CHANGE
 
   #######################################################################################
   #####################################   HYPS   ########################################
   #######################################################################################
 
-  data_path = 'data/train_all_tasks.csv'
+  data_path = 'data/test_task_b_entries.csv'#'data/train_all_tasks.csv'
   test_data_path = 'data/test_task_b_entries.csv'
   model_path = 'experts_by_pretraining_models'
 
@@ -40,16 +41,22 @@ if __name__ == "__main__":
   for model_id in model_dict:
     
     results_by_balancing = {}
-    for b in train_balanced:
+    for b in train_balanced: 
       
       # PREPARE DATA
       model_name = model_dict[model_id]
 
-      data, attributes = load_arrange_data(data_path)
+      data, attributes = load_arrange_data(data_path,test_submission_flag)
 
-      X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
+      if test_submission_flag == True:
+        X_train = data
+        X_test = data
+        y_test = data['label_category']
+        y_train = data['label_category']
+      else:
+        X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
       
-      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) 
+      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = False) #######REPLACE FALSE WITH B
       full_expert_dm.setup()
       
       # PREPARE MODELS
@@ -135,16 +142,23 @@ if __name__ == "__main__":
         print('\n')'''
 
   # MAKE SEMEVAL SUBMISSION FILE
-  X_test['label_pred'] =  y_pred
-  X_test.drop(['text', 'label_sexist', 'label_category', 'label_vector'], inplace=True, axis=1)
-  X_test.drop(attributes, inplace=True, axis=1)
+  
+  X_test['label_pred_int'] =  y_pred
+
   label_map = {                                  
-    1:'1. threats, plans to harm and incitement',
-    2:'2. derogation',
-    3:'3. animosity',
-    4:'4. prejudiced discussions'
+    0: "1. threats, plans to harm and incitement",
+    1: "2. derogation",
+    2: "3. animosity",
+    3: "4. prejudiced discussions",
     }
-  X_test['label_pred'].replace(label_map, inplace=True) 
+  #X_test['label_pred'].replace(label_map, inplace=True) 
+  '''X_test['label_pred'] = X_test['rewire_id']
+  for x in range(len(X_test)):
+    for i in range(4):
+      X_test['label_pred'][x]=label_map[i]
+  '''
+  X_test.drop(['text', 'label_category'], inplace=True, axis=1) #, 'label_pred_int'
+  X_test.drop(attributes, inplace=True, axis=1)
 
   X_test.to_csv('data/test_task_b_entries_pred.csv',index=False)
   pred = pd.read_csv('data/test_task_b_entries_pred.csv')
