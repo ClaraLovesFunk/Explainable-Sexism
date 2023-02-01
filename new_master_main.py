@@ -29,8 +29,8 @@ if __name__ == "__main__":
     'GroNLP/hateBERT': 'hateBERT', 
     'bert-base-uncased': 'BERT_base_uncased',
     }
-  use_trained_model = [True, False] 
-  train_balanced = [True, False]
+  use_trained_model = [True] 
+  train_balanced = [True]
 
   #######################################################################################
   #####################################   HYPS   ########################################
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     'n_epochs': 1          #######20     
   }
 
-  checkpoint_callback = ModelCheckpoint(
+  '''checkpoint_callback = ModelCheckpoint(
     dirpath=model_path,
     save_top_k=1,
     monitor="val loss",
@@ -83,7 +83,9 @@ if __name__ == "__main__":
     gpus=1, 
     num_sanity_val_steps=50,
     callbacks=[checkpoint_callback]
-    )
+    )'''
+
+  trainer = pl.Trainer()
   
   # TRAINING
   if train_master_flag == True: 
