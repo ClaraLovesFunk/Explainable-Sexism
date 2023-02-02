@@ -15,17 +15,17 @@ if __name__ == "__main__":
   #####################################   FLAGS   #######################################
   #######################################################################################
   
-  train_expert_flag = False
+  train_expert_flag = True
 
   #######################################################################################
   ############################   VALUES TO ITERATE OVER   ###############################
   #######################################################################################
 
   model_dict = {
-    'GroNLP/hateBERT': 'hateBERT', 
-    #'bert-base-uncased': 'BERT_base_uncased',
+    #'GroNLP/hateBERT': 'hateBERT', 
+    'bert-base-uncased': 'BERT_base_uncased',
     }
-  train_balanced = [True]      ###################### CHANGE
+  train_balanced = [True]      
 
   #######################################################################################
   #####################################   HYPS   ########################################
@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
       X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
       
-      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) 
+      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) ########### CHANGE SAMPLE SIZE AGAIN IN EXPERT_MODULES.PY
       full_expert_dm.setup()
       
       # PREPARE MODELS
@@ -55,15 +55,14 @@ if __name__ == "__main__":
         'model_name': model_id,
         'n_labels': len(attributes), 
         'batch_size': 2,                 
-        'lr': 1.5e-6,
+        'lr': 1.5e-3,           #######1.5e-6
         'warmup': 0.2, 
         'train_size': len(full_expert_dm.train_dataloader()),
         'weight_decay': 0.001,
-        'n_epochs': 1 #10     
+        'n_epochs': 1      
       }
 
-      
-      '''checkpoint_callback = ModelCheckpoint(
+      checkpoint_callback = ModelCheckpoint(
         dirpath=model_path,
         save_top_k=1,
         monitor="val loss",
@@ -71,14 +70,12 @@ if __name__ == "__main__":
         )
 
       trainer = pl.Trainer(
-        max_epochs=config['n_epochs'], 
+        max_epochs=config['n_epochs'],                  ###############               , 
         gpus=1, 
         num_sanity_val_steps=50,
         callbacks=[checkpoint_callback]
-        )'''
+        )
 
-      
-      trainer = pl.Trainer()
       
       # TRAINING
       if train_expert_flag == True: 
@@ -91,11 +88,7 @@ if __name__ == "__main__":
       # TESTING
 
       full_expert = Expert_Classifier(config)  
-      print(f'{model_path}/{model_name}_bal_{b}.pt')                                          
-      #full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}_bal_{b}.pt'))
-
-      full_expert.load_state_dict(torch.load('experts_by_pretraining_models/hateBERT_bal_True.pt'))
-      
+      full_expert.load_state_dict(torch.load(f'{model_path}/{model_name}_bal_{b}.pt'))
       full_expert.eval()
 
       y_pred_tensor = trainer.predict(full_expert, full_expert_dm)
@@ -105,7 +98,8 @@ if __name__ == "__main__":
       y_pred = y_pred_arr
 
       perf_metrics = {
-        'f1': f1_score(y_test, y_pred, average="macro"),
+        'f1-macro_avrg': f1_score(y_test, y_pred, average="macro"),
+        'f1-no_avrg': f1_score(y_test, y_pred, average=None),
         'acc': accuracy_score(y_test, y_pred), 
         }
 
@@ -122,6 +116,7 @@ if __name__ == "__main__":
     for b in train_balanced:
       print('-----------------------------------------------------------')
       print(f'bal-{b}:')
-      print(results[model_dict[model_id]][b]['f1']) #f'f1: ', 
+      print(results[model_dict[model_id]][b]['f1-macro_avrg']) #f'f1: ', 
+      print(results[model_dict[model_id]][b]['f1-no_avrg']) #f'f1: ', 
       print(results[model_dict[model_id]][b]['acc']) #f'acc: ', 
       print('\n')

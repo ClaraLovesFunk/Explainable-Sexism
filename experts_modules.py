@@ -88,7 +88,7 @@ class Expert_DataModule(pl.LightningDataModule):
       self.val_dataset = Expert_Dataset(self.X_test, attributes=self.attributes, tokenizer=self.tokenizer) 
 
   def train_dataloader(self): 
-    return DataLoader(self.train_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True) # CAN WE SHUFFLE AND STILL USE SEED
+    return DataLoader(self.train_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True) 
 
   def val_dataloader(self):
     return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
