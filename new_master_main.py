@@ -12,46 +12,28 @@ from experts_modules import *
 
 if __name__ == "__main__":
 
-  #######################################################################################
-  #####################################   FLAGS   #######################################
-  #######################################################################################
-  
   train_master_flag = True
   test_master_flag = True
-  
-  train_expert_flag = False
-  balance_classes = True
+  exp_bal_train = True
 
-  #######################################################################################
-  ############################   VALUES TO ITERATE OVER   ###############################
-  #######################################################################################
-
-  model_dict = {
+  expert_info = {
     'GroNLP/hateBERT': 'hateBERT', 
     'bert-base-uncased': 'BERT_base_uncased',
     }
   
-  train_balanced = True
-
-  #######################################################################################
-  #####################################   HYPS   ########################################
-  #######################################################################################
-
   data_path = 'data/train_all_tasks.csv'
   expert_model_path = 'expert_models'
   master_model_path = 'master_models'
 
   # PREPARE DATA
-  expert0_id = list(model_dict.keys())[0]
-  expert1_id = list(model_dict.keys())[1]
-  expert0_name = model_dict[expert0_id]
-  expert1_name = model_dict[expert1_id]
+  expert_id = list(expert_info.keys())#['GroNLP/hateBERT','bert-base-uncased'] 
+  expert_name = list(expert_info.values()) #[expert_info[expert_id[0]], expert_info[expert_id[0]]]
 
   data, attributes = load_arrange_data(data_path)
 
   X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
   
-  master_dm = Master_DataModule(expert0_id, X_train, X_test, attributes=attributes, sample = balance_classes) ###### MAKE EXPERT MODULE1 AND 2
+  master_dm = Master_DataModule(expert_id[0], X_train, X_test, attributes=attributes, sample = exp_bal_train) ###### MAKE EXPERT MODULE1 AND 2
   master_dm.setup()
 
 
@@ -61,9 +43,10 @@ if __name__ == "__main__":
 
   # LOADING EXPERTS AND CUTTING OFF HIDDEN LAYER AND CLASSIFICATION HEAD
 
-  expert_config = {
-    'model_name': expert0_id,
-    'model_name1': expert1_id,
+  config_expert = {
+    'model_name': expert_id[0],
+    'model_name1': expert_id[1],
+    'experts': expert_id,
     'n_labels': len(attributes), 
     'batch_size': 2,                 
     'lr': 1.5e-3,           #######1.5e-6
@@ -73,52 +56,75 @@ if __name__ == "__main__":
     'n_epochs': 1      
   }
 
-  full_expert = Expert_Classifier(expert_config) 
-  full_expert1 = Expert_Classifier(expert_config) 
-  #print((f'{expert_model_path}/{expert0_name}_bal_{train_balanced}.pt'))  
+  
+  full_experts = [] #[Expert_Classifier(config_expert), Expert_Classifier(config_expert)]
+  experts = []
+  finetuned_dict = []
+  model_dict = []
+
+  for i in range(2):
+    full_experts.append(Expert_Classifier(config_expert))
+    full_experts[i] = Expert_Classifier(config_expert) 
+    full_experts[i].load_state_dict(torch.load(f'{expert_model_path}/{expert_name[i]}_bal_{exp_bal_train}.pt'))
+
+    experts.append(AutoModel.from_pretrained(expert_id[i]))
+
+    finetuned_dict.append(full_experts[i].state_dict())
+
+    model_dict.append(experts[i].state_dict())
+
+    finetuned_dict[i] = {k: v for k, v in finetuned_dict[i].items() if k in model_dict[i]}
+
+    model_dict[i].update(finetuned_dict[i])
+
+    experts[i].load_state_dict(model_dict[i])
+
+    experts[i].eval()
+
+
+  #full_experts[0] = Expert_Classifier(config_expert) 
+  #full_experts[1] = Expert_Classifier(config_expert) 
                                         
-  full_expert.load_state_dict(torch.load(f'{expert_model_path}/{expert0_name}_bal_{train_balanced}.pt'))
-  full_expert1.load_state_dict(torch.load(f'{expert_model_path}/{expert1_name}_bal_{train_balanced}.pt')) 
+  #full_experts[0].load_state_dict(torch.load(f'{expert_model_path}/{expert_name[0]}_bal_{exp_bal_train}.pt'))
+  #full_experts[1].load_state_dict(torch.load(f'{expert_model_path}/{expert_name[1]}_bal_{exp_bal_train}.pt')) 
  
   #full_experts, configs = train_experts(df, model_name, doTrain=True, doTest=True)
 
-  expert = AutoModel.from_pretrained(expert0_id) 
-  expert1 = AutoModel.from_pretrained(expert1_id) 
+  #expert = AutoModel.from_pretrained(expert_id[0]) 
+  #expert1 = AutoModel.from_pretrained(expert_id[1]) 
 
-  finetuned_dict = full_expert.state_dict()
-  finetuned_dict1 = full_expert1.state_dict()
+  #finetuned_dict = full_experts[0].state_dict()
+  #finetuned_dict1 = full_experts[1].state_dict()
 
-  model_dict = expert.state_dict()
-  model_dict1 = expert1.state_dict()
+  #expert_info = expert.state_dict()
+  #model_dict1 = expert1.state_dict()
   
   # 1. filter out unnecessary keys
-  finetuned_dict = {k: v for k, v in finetuned_dict.items() if k in model_dict}
-  finetuned_dict1 = {k: v for k, v in finetuned_dict1.items() if k in model_dict1}
+  #finetuned_dict = {k: v for k, v in finetuned_dict.items() if k in expert_info}
+  #finetuned_dict1 = {k: v for k, v in finetuned_dict1.items() if k in model_dict1}
 
   # 2. overwrite entries in the existing state dict
-  model_dict.update(finetuned_dict) 
-  model_dict1.update(finetuned_dict1) 
+  #expert_info.update(finetuned_dict) 
+  #model_dict1.update(finetuned_dict1) 
 
   # 3. load the new state dict
-  expert.load_state_dict(model_dict)
-  expert1.load_state_dict(model_dict1)
+  #expert.load_state_dict(expert_info)
+  #expert1.load_state_dict(model_dict1)
 
   # freeze the weights for the master model
-  expert.eval()
-  expert1.eval()
+  #expert.eval()
+  #expert1.eval()
 
-
+  #experts = [expert,expert1]
 
 
 
 
   
   # PREPARE MODELS
-  config = {
-    'model_name': expert0_id, ##### THE GENERIC MODEL IS LOADED FOR FINETUNING -- SUBSITUTE WITH OUR OWN FINETUNED MODELS
-    'expert': expert,
-    'expert1': expert1,
-    'n_labels': len(attributes), 
+  config_master = {
+    'experts': experts,
+    'n_labels': len(attributes),
     'batch_size': 2,                 
     'lr': 1.5e-6,
     'warmup': 0.2, 
@@ -135,7 +141,7 @@ if __name__ == "__main__":
     )
 
   trainer = pl.Trainer(
-    max_epochs=config['n_epochs'], 
+    max_epochs=config_master['n_epochs'], 
     gpus=1, 
     num_sanity_val_steps=50,
     callbacks=[checkpoint_callback]
@@ -160,15 +166,15 @@ if __name__ == "__main__":
 
   # TRAINING
   if train_master_flag == True: 
-    master_clf = Master_Classifier(config)
+    master_clf = Master_Classifier(config_master,config_expert)
     trainer.fit(master_clf, master_dm)
-    torch.save(master_clf.state_dict(),f'{master_model_path}/master.pt')
+    torch.save(master_clf.state_dict(),f'{master_model_path}/master-{expert_name[0]}-{expert_name[1]}-bal_{exp_bal_train}.pt')
   
 
   # TESTING
   if test_master_flag == True:   
-    master_clf = Master_Classifier(config)                                          
-    master_clf.load_state_dict(torch.load(f'{master_model_path}/master.pt')) 
+    master_clf = Master_Classifier(config_master,config_expert)                                          
+    master_clf.load_state_dict(torch.load(f'{master_model_path}/master-{expert_name[0]}-{expert_name[1]}-bal_{exp_bal_train}.pt')) 
     master_clf.eval()
 
     # get predictions and turn to array

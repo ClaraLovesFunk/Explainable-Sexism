@@ -103,13 +103,14 @@ class Master_DataModule(pl.LightningDataModule):
 
 class Master_Classifier(pl.LightningModule):
 
-  def __init__(self, config: dict):
+  def __init__(self, config_master: dict, config_expert:dict):
     super().__init__()
-    self.config = config
+    self.config_master = config_master
+    self.config_expert = config_expert
 
     device = torch.device("cuda")
-    self.expert = self.config['expert']       ########## MAKE SEXY LOOP
-    self.expert1 = self.config['expert1']
+    self.expert = self.config_master['experts'][0]       ########## MAKE SEXY LOOP
+    self.expert1 = self.config_master['experts'][1]
 
     self.expert.to(device)
     self.expert1.to(device)
@@ -119,12 +120,12 @@ class Master_Classifier(pl.LightningModule):
 
     #self.pretrained_model = AutoModel.from_pretrained(config['model_name'], return_dict = True) ######## DO TWO CONFIGS FOR BERT AND FOR HATEBERT
     self.hidden = torch.nn.Linear(self.expert.config.hidden_size+self.expert1.config.hidden_size, 512) #############self.expert.config.hidden_size (connect to config_master)
-    self.classifier = torch.nn.Linear(512, self.config['n_labels']) ########self.expert.config.hidden_size (same as above)
+    self.classifier = torch.nn.Linear(512, self.config_master['n_labels']) ########self.expert.config.hidden_size (same as above)
     self.soft = torch.nn.Softmax(dim=1)
     torch.nn.init.xavier_uniform_(self.classifier.weight) 
     self.loss_func = nn.BCEWithLogitsLoss(reduction='mean') 
     self.dropout = nn.Dropout()
-    self.f1_func = MulticlassF1Score(num_classes = self.config['n_labels']) 
+    self.f1_func = MulticlassF1Score(num_classes = self.config_master['n_labels']) 
     
   def forward(self, input_ids, attention_mask, labels=None):
     # roberta layer
@@ -147,8 +148,8 @@ class Master_Classifier(pl.LightningModule):
     loss = 0
     f1 = 0
     if labels is not None:
-      loss = self.loss_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels'])) 
-      f1 = self.f1_func(logits.view(-1, self.config['n_labels']), labels.view(-1, self.config['n_labels']))      
+      loss = self.loss_func(logits.view(-1, self.config_master['n_labels']), labels.view(-1, self.config_master['n_labels'])) 
+      f1 = self.f1_func(logits.view(-1, self.config_master['n_labels']), labels.view(-1, self.config_master['n_labels']))      
     return loss, f1, logits
 
   def training_step(self, batch, batch_index):
@@ -174,9 +175,9 @@ class Master_Classifier(pl.LightningModule):
     return outputs
 
   def configure_optimizers(self):
-    optimizer = AdamW(self.parameters(), lr=self.config['lr'], weight_decay=self.config['weight_decay'])
-    total_steps = self.config['train_size']/self.config['batch_size']
-    warmup_steps = math.floor(total_steps * self.config['warmup'])
-    warmup_steps = math.floor(total_steps * self.config['warmup'])
+    optimizer = AdamW(self.parameters(), lr=self.config_master['lr'], weight_decay=self.config_master['weight_decay'])
+    total_steps = self.config_master['train_size']/self.config_master['batch_size']
+    warmup_steps = math.floor(total_steps * self.config_master['warmup'])
+    warmup_steps = math.floor(total_steps * self.config_master['warmup'])
     scheduler = get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps)
     return [optimizer],[scheduler]
