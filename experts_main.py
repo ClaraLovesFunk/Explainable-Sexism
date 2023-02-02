@@ -22,17 +22,17 @@ if __name__ == "__main__":
   #######################################################################################
 
   model_dict = {
-    #'GroNLP/hateBERT': 'hateBERT', 
+    'GroNLP/hateBERT': 'hateBERT', 
     'bert-base-uncased': 'BERT_base_uncased',
     }
-  train_balanced = [True]      
+  train_balanced = [True, False]      
 
   #######################################################################################
   #####################################   HYPS   ########################################
   #######################################################################################
 
   data_path = 'data/train_all_tasks.csv'
-  model_path = 'experts_by_pretraining_models'
+  model_path = 'expert_models'
 
   results_by_fullExpert = {}
   for model_id in model_dict:
@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
       X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
       
-      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) ########### CHANGE SAMPLE SIZE AGAIN IN EXPERT_MODULES.PY
+      full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) 
       full_expert_dm.setup()
       
       # PREPARE MODELS
@@ -55,11 +55,11 @@ if __name__ == "__main__":
         'model_name': model_id,
         'n_labels': len(attributes), 
         'batch_size': 2,                 
-        'lr': 1.5e-3,           #######1.5e-6
+        'lr': 1.5e-6,           
         'warmup': 0.2, 
         'train_size': len(full_expert_dm.train_dataloader()),
         'weight_decay': 0.001,
-        'n_epochs': 1      
+        'n_epochs': 20      
       }
 
       checkpoint_callback = ModelCheckpoint(
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         )
 
       trainer = pl.Trainer(
-        max_epochs=config['n_epochs'],                  ###############               , 
+        max_epochs=config['n_epochs'],                                  
         gpus=1, 
         num_sanity_val_steps=50,
         callbacks=[checkpoint_callback]

@@ -25,9 +25,13 @@ if __name__ == "__main__":
   expert_model_path = 'expert_models'
   master_model_path = 'master_models'
 
+
+
+
   # PREPARE DATA
-  expert_id = list(expert_info.keys())#['GroNLP/hateBERT','bert-base-uncased'] 
-  expert_name = list(expert_info.values()) #[expert_info[expert_id[0]], expert_info[expert_id[0]]]
+
+  expert_id = list(expert_info.keys()) 
+  expert_name = list(expert_info.values()) 
 
   data, attributes = load_arrange_data(data_path)
 
@@ -38,26 +42,22 @@ if __name__ == "__main__":
 
 
 
-
-
-
   # LOADING EXPERTS AND CUTTING OFF HIDDEN LAYER AND CLASSIFICATION HEAD
 
   config_expert = {
-    'model_name': expert_id[0],
+    'model_name': expert_id[0],            ###### CURRENTLY STILL NECESSARY FOR EXPERT MODULE
     'model_name1': expert_id[1],
     'experts': expert_id,
     'n_labels': len(attributes), 
     'batch_size': 2,                 
-    'lr': 1.5e-3,           #######1.5e-6
+    'lr': 1.5e-6,           
     'warmup': 0.2, 
     'train_size': len(master_dm.train_dataloader()),
     'weight_decay': 0.001,
-    'n_epochs': 1      
+    'n_epochs': 20      
   }
 
-  
-  full_experts = [] #[Expert_Classifier(config_expert), Expert_Classifier(config_expert)]
+  full_experts = [] 
   experts = []
   finetuned_dict = []
   model_dict = []
@@ -66,58 +66,13 @@ if __name__ == "__main__":
     full_experts.append(Expert_Classifier(config_expert))
     full_experts[i] = Expert_Classifier(config_expert) 
     full_experts[i].load_state_dict(torch.load(f'{expert_model_path}/{expert_name[i]}_bal_{exp_bal_train}.pt'))
-
     experts.append(AutoModel.from_pretrained(expert_id[i]))
-
     finetuned_dict.append(full_experts[i].state_dict())
-
     model_dict.append(experts[i].state_dict())
-
     finetuned_dict[i] = {k: v for k, v in finetuned_dict[i].items() if k in model_dict[i]}
-
     model_dict[i].update(finetuned_dict[i])
-
     experts[i].load_state_dict(model_dict[i])
-
     experts[i].eval()
-
-
-  #full_experts[0] = Expert_Classifier(config_expert) 
-  #full_experts[1] = Expert_Classifier(config_expert) 
-                                        
-  #full_experts[0].load_state_dict(torch.load(f'{expert_model_path}/{expert_name[0]}_bal_{exp_bal_train}.pt'))
-  #full_experts[1].load_state_dict(torch.load(f'{expert_model_path}/{expert_name[1]}_bal_{exp_bal_train}.pt')) 
- 
-  #full_experts, configs = train_experts(df, model_name, doTrain=True, doTest=True)
-
-  #expert = AutoModel.from_pretrained(expert_id[0]) 
-  #expert1 = AutoModel.from_pretrained(expert_id[1]) 
-
-  #finetuned_dict = full_experts[0].state_dict()
-  #finetuned_dict1 = full_experts[1].state_dict()
-
-  #expert_info = expert.state_dict()
-  #model_dict1 = expert1.state_dict()
-  
-  # 1. filter out unnecessary keys
-  #finetuned_dict = {k: v for k, v in finetuned_dict.items() if k in expert_info}
-  #finetuned_dict1 = {k: v for k, v in finetuned_dict1.items() if k in model_dict1}
-
-  # 2. overwrite entries in the existing state dict
-  #expert_info.update(finetuned_dict) 
-  #model_dict1.update(finetuned_dict1) 
-
-  # 3. load the new state dict
-  #expert.load_state_dict(expert_info)
-  #expert1.load_state_dict(model_dict1)
-
-  # freeze the weights for the master model
-  #expert.eval()
-  #expert1.eval()
-
-  #experts = [expert,expert1]
-
-
 
 
   
@@ -130,7 +85,7 @@ if __name__ == "__main__":
     'warmup': 0.2, 
     'train_size': len(master_dm.train_dataloader()),
     'weight_decay': 0.001,
-    'n_epochs': 1          #######20     
+    'n_epochs': 20          #######20     
   }
 
   checkpoint_callback = ModelCheckpoint(
@@ -149,27 +104,13 @@ if __name__ == "__main__":
   
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   # TRAINING
   if train_master_flag == True: 
     master_clf = Master_Classifier(config_master,config_expert)
     trainer.fit(master_clf, master_dm)
     torch.save(master_clf.state_dict(),f'{master_model_path}/master-{expert_name[0]}-{expert_name[1]}-bal_{exp_bal_train}.pt')
   
+
 
   # TESTING
   if test_master_flag == True:   
@@ -191,8 +132,8 @@ if __name__ == "__main__":
       'acc': accuracy_score(y_test, y_pred), 
       }
 
-    np.save('results.npy', perf_metrics) 
-    results = np.load('results.npy',allow_pickle='TRUE').item()
+    np.save('results_master.npy', perf_metrics) 
+    results = np.load('results_master.npy',allow_pickle='TRUE').item()
     print('-----------------------------------------------------------')
     print('-----------------------------------------------------------')
     print(f'f1-macro_avrg: {results["f1-macro_avrg"]}')
