@@ -29,7 +29,7 @@ if __name__ == "__main__":
     'GroNLP/hateBERT': 'hateBERT', 
     'bert-base-uncased': 'BERT_base_uncased',
     }
-  use_trained_model = [True] 
+  
   train_balanced = [True]
 
   #######################################################################################
@@ -39,13 +39,6 @@ if __name__ == "__main__":
   data_path = 'data/train_all_tasks.csv'
   model_path = 'experts_by_pretraining_models'
 
-
-  #results_by_model = {}
-  #for model_id in model_dict:
-    
-  #results_by_balancing = {}
-  #for b in train_balanced:
-  
   # PREPARE DATA
   expert0_id = list(model_dict.keys())[0]
   expert1_id = list(model_dict.keys())[1]
@@ -56,12 +49,12 @@ if __name__ == "__main__":
 
   X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
   
-  master_dm = Master_DataModule(expert0_id, X_train, X_test, attributes=attributes, sample = balance_classes) ###### WE CAN USE THE SAME TOKENIZER FOR BERT AND HATEBERT?
+  master_dm = Master_DataModule(expert0_id, X_train, X_test, attributes=attributes, sample = balance_classes) ###### MAKE EXPERT MODULE1 AND 2
   master_dm.setup()
   
   # PREPARE MODELS
   config = {
-    'model_name': expert0_id, 
+    'model_name': expert0_id, ##### THE GENERIC MODEL IS LOADED FOR FINETUNING -- SUBSITUTE WITH OUR OWN FINETUNED MODELS
     'n_labels': len(attributes), 
     'batch_size': 2,                 
     'lr': 1.5e-6,
@@ -71,7 +64,7 @@ if __name__ == "__main__":
     'n_epochs': 1          #######20     
   }
 
-  '''checkpoint_callback = ModelCheckpoint(
+  checkpoint_callback = ModelCheckpoint(
     dirpath=model_path,
     save_top_k=1,
     monitor="val loss",
@@ -83,9 +76,7 @@ if __name__ == "__main__":
     gpus=1, 
     num_sanity_val_steps=50,
     callbacks=[checkpoint_callback]
-    )'''
-
-  trainer = pl.Trainer()
+    )
   
   # TRAINING
   if train_master_flag == True: 
@@ -96,9 +87,8 @@ if __name__ == "__main__":
 
   # TESTING
   if test_master_flag == True:   
-    master_clf = Master_Classifier(config)                                                         
-    #master_clf.load_state_dict(torch.load('experts_by_pretraining_models/master.pt'))
-    master_clf.load_state_dict(torch.load(f'{model_path}/master.pt')) ######maybe master model was not
+    master_clf = Master_Classifier(config)                                          
+    master_clf.load_state_dict(torch.load(f'{model_path}/master.pt')) 
     master_clf.eval()
 
     # get predictions and turn to array
@@ -110,7 +100,8 @@ if __name__ == "__main__":
 
     # compute performance
     perf_metrics = {
-      'f1': f1_score(y_test, y_pred, average="macro"),
+      'f1-macro_avrg': f1_score(y_test, y_pred, average="macro"),
+      'f1-no_avrg': f1_score(y_test, y_pred, average=None),
       'acc': accuracy_score(y_test, y_pred), 
       }
 
@@ -118,5 +109,6 @@ if __name__ == "__main__":
     results = np.load('results.npy',allow_pickle='TRUE').item()
     print('-----------------------------------------------------------')
     print('-----------------------------------------------------------')
-    print(f'f1: {results["f1"]}')
+    print(f'f1-macro_avrg: {results["f1-macro_avrg"]}')
+    print(f'f1-no_avrg: {results["f1-no_avrg"]}')
     print(f'acc: {results["acc"]}')

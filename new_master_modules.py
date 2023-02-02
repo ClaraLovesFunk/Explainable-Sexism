@@ -26,7 +26,6 @@ class Master_Dataset(Dataset):
 
     if self.sample:                          
 
-      #label_none = self.data.loc[self.data['none']==1] ##### CONNECT WITH ATTRIBUTES FROM EDA
       label_derogation = self.data.loc[self.data['1. threats, plans to harm and incitement']==1] 
       label_animosity = self.data.loc[self.data['2. derogation']==1]
       label_threats = self.data.loc[self.data['3. animosity']==1]
@@ -37,7 +36,6 @@ class Master_Dataset(Dataset):
       sample_size = min(class_sizes)
 
       self.data = pd.concat([
-        #label_none.sample(sample_size, random_state=0), 
         label_derogation.sample(sample_size, random_state=0), 
         label_animosity.sample(sample_size, random_state=0), 
         label_threats.sample(sample_size, random_state=0), 
