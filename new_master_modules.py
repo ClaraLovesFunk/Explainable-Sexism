@@ -108,13 +108,18 @@ class Master_Classifier(pl.LightningModule):
     self.config = config
 
     device = torch.device("cuda")
-    self.expert = self.config['expert']
+    self.expert = self.config['expert']       ########## MAKE SEXY LOOP
+    self.expert1 = self.config['expert1']
+
     self.expert.to(device)
+    self.expert1.to(device)
+
     self.expert.eval()
+    self.expert1.eval()
 
     #self.pretrained_model = AutoModel.from_pretrained(config['model_name'], return_dict = True) ######## DO TWO CONFIGS FOR BERT AND FOR HATEBERT
-    self.hidden = torch.nn.Linear(self.expert.config.hidden_size, self.expert.config.hidden_size)
-    self.classifier = torch.nn.Linear(self.expert.config.hidden_size, self.config['n_labels'])
+    self.hidden = torch.nn.Linear(self.expert.config.hidden_size+self.expert1.config.hidden_size, 512) #############self.expert.config.hidden_size (connect to config_master)
+    self.classifier = torch.nn.Linear(512, self.config['n_labels']) ########self.expert.config.hidden_size (same as above)
     self.soft = torch.nn.Softmax(dim=1)
     torch.nn.init.xavier_uniform_(self.classifier.weight) 
     self.loss_func = nn.BCEWithLogitsLoss(reduction='mean') 
@@ -123,8 +128,14 @@ class Master_Classifier(pl.LightningModule):
     
   def forward(self, input_ids, attention_mask, labels=None):
     # roberta layer
-    output = self.expert(input_ids=input_ids, attention_mask=attention_mask) 
-    pooled_output = torch.mean(output.last_hidden_state, 1) 
+    output0 = self.expert(input_ids=input_ids, attention_mask=attention_mask)  ###### MAKE LOOP
+    pooled_output0 = torch.mean(output0.last_hidden_state, 1)
+
+    output1 = self.expert1(input_ids=input_ids, attention_mask=attention_mask)
+    pooled_output1 = torch.mean(output1.last_hidden_state, 1)
+
+    pooled_output = torch.cat((pooled_output0, pooled_output1), 1)
+
     # final logits
     pooled_output = self.dropout(pooled_output)
     pooled_output = self.hidden(pooled_output)

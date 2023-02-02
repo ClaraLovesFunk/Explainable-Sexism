@@ -63,6 +63,7 @@ if __name__ == "__main__":
 
   expert_config = {
     'model_name': expert0_id,
+    'model_name1': expert1_id,
     'n_labels': len(attributes), 
     'batch_size': 2,                 
     'lr': 1.5e-3,           #######1.5e-6
@@ -73,23 +74,38 @@ if __name__ == "__main__":
   }
 
   full_expert = Expert_Classifier(expert_config) 
-  print((f'{expert_model_path}/{expert0_name}_bal_{train_balanced}.pt'))                                         
-  full_expert.load_state_dict(torch.load(f'{expert_model_path}/{expert0_name}_bal_{train_balanced}.pt')) 
+  full_expert1 = Expert_Classifier(expert_config) 
+  #print((f'{expert_model_path}/{expert0_name}_bal_{train_balanced}.pt'))  
+                                        
+  full_expert.load_state_dict(torch.load(f'{expert_model_path}/{expert0_name}_bal_{train_balanced}.pt'))
+  full_expert1.load_state_dict(torch.load(f'{expert_model_path}/{expert1_name}_bal_{train_balanced}.pt')) 
+ 
   #full_experts, configs = train_experts(df, model_name, doTrain=True, doTest=True)
 
   expert = AutoModel.from_pretrained(expert0_id) 
-  #for i in range(len(label_map)):
+  expert1 = AutoModel.from_pretrained(expert1_id) 
+
   finetuned_dict = full_expert.state_dict()
+  finetuned_dict1 = full_expert1.state_dict()
+
   model_dict = expert.state_dict()
+  model_dict1 = expert1.state_dict()
   
   # 1. filter out unnecessary keys
   finetuned_dict = {k: v for k, v in finetuned_dict.items() if k in model_dict}
+  finetuned_dict1 = {k: v for k, v in finetuned_dict1.items() if k in model_dict1}
+
   # 2. overwrite entries in the existing state dict
   model_dict.update(finetuned_dict) 
+  model_dict1.update(finetuned_dict1) 
+
   # 3. load the new state dict
   expert.load_state_dict(model_dict)
+  expert1.load_state_dict(model_dict1)
+
   # freeze the weights for the master model
   expert.eval()
+  expert1.eval()
 
 
 
@@ -101,6 +117,7 @@ if __name__ == "__main__":
   config = {
     'model_name': expert0_id, ##### THE GENERIC MODEL IS LOADED FOR FINETUNING -- SUBSITUTE WITH OUR OWN FINETUNED MODELS
     'expert': expert,
+    'expert1': expert1,
     'n_labels': len(attributes), 
     'batch_size': 2,                 
     'lr': 1.5e-6,
