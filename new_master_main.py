@@ -6,6 +6,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from EDA import *
 from new_master_modules import *
+from experts_modules import *
 
 
 
@@ -30,14 +31,15 @@ if __name__ == "__main__":
     'bert-base-uncased': 'BERT_base_uncased',
     }
   
-  train_balanced = [True]
+  train_balanced = True
 
   #######################################################################################
   #####################################   HYPS   ########################################
   #######################################################################################
 
   data_path = 'data/train_all_tasks.csv'
-  model_path = 'experts_by_pretraining_models'
+  expert_model_path = 'expert_models'
+  master_model_path = 'master_models'
 
   # PREPARE DATA
   expert0_id = list(model_dict.keys())[0]
@@ -51,10 +53,54 @@ if __name__ == "__main__":
   
   master_dm = Master_DataModule(expert0_id, X_train, X_test, attributes=attributes, sample = balance_classes) ###### MAKE EXPERT MODULE1 AND 2
   master_dm.setup()
+
+
+
+
+
+
+  # LOADING EXPERTS AND CUTTING OFF HIDDEN LAYER AND CLASSIFICATION HEAD
+
+  expert_config = {
+    'model_name': expert0_id,
+    'n_labels': len(attributes), 
+    'batch_size': 2,                 
+    'lr': 1.5e-3,           #######1.5e-6
+    'warmup': 0.2, 
+    'train_size': len(master_dm.train_dataloader()),
+    'weight_decay': 0.001,
+    'n_epochs': 1      
+  }
+
+  full_expert = Expert_Classifier(expert_config) 
+  print((f'{expert_model_path}/{expert0_name}_bal_{train_balanced}.pt'))                                         
+  full_expert.load_state_dict(torch.load(f'{expert_model_path}/{expert0_name}_bal_{train_balanced}.pt')) 
+  #full_experts, configs = train_experts(df, model_name, doTrain=True, doTest=True)
+
+  expert = AutoModel.from_pretrained(expert0_id) 
+  #for i in range(len(label_map)):
+  finetuned_dict = full_expert.state_dict()
+  model_dict = expert.state_dict()
+  
+  # 1. filter out unnecessary keys
+  finetuned_dict = {k: v for k, v in finetuned_dict.items() if k in model_dict}
+  # 2. overwrite entries in the existing state dict
+  model_dict.update(finetuned_dict) 
+  # 3. load the new state dict
+  expert.load_state_dict(model_dict)
+  # freeze the weights for the master model
+  expert.eval()
+
+
+
+
+
+
   
   # PREPARE MODELS
   config = {
     'model_name': expert0_id, ##### THE GENERIC MODEL IS LOADED FOR FINETUNING -- SUBSITUTE WITH OUR OWN FINETUNED MODELS
+    'expert': expert,
     'n_labels': len(attributes), 
     'batch_size': 2,                 
     'lr': 1.5e-6,
@@ -65,7 +111,7 @@ if __name__ == "__main__":
   }
 
   checkpoint_callback = ModelCheckpoint(
-    dirpath=model_path,
+    dirpath=expert_model_path,
     save_top_k=1,
     monitor="val loss",
     filename=f'master',
@@ -78,17 +124,34 @@ if __name__ == "__main__":
     callbacks=[checkpoint_callback]
     )
   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   # TRAINING
   if train_master_flag == True: 
     master_clf = Master_Classifier(config)
     trainer.fit(master_clf, master_dm)
-    torch.save(master_clf.state_dict(),f'{model_path}/master.pt')
+    torch.save(master_clf.state_dict(),f'{master_model_path}/master.pt')
   
 
   # TESTING
   if test_master_flag == True:   
     master_clf = Master_Classifier(config)                                          
-    master_clf.load_state_dict(torch.load(f'{model_path}/master.pt')) 
+    master_clf.load_state_dict(torch.load(f'{master_model_path}/master.pt')) 
     master_clf.eval()
 
     # get predictions and turn to array
