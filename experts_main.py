@@ -56,11 +56,11 @@ if __name__ == "__main__":
         'model_name': model_id,
         'n_labels': len(attributes), 
         'batch_size': 2,                 
-        'lr': 1.5e-6,     ########1.5e-6      
+        'lr': 1.5e-6,          
         'warmup': 0.2, 
         'train_size': len(full_expert_dm.train_dataloader()),
         'weight_decay': 0.001,
-        'n_epochs': 1 ############20      
+        'n_epochs': 20      
       }
 
       checkpoint_callback = ModelCheckpoint(
@@ -203,11 +203,11 @@ if __name__ == "__main__":
     'experts': experts,
     'n_labels': len(attributes),
     'batch_size': 2,                 
-    'lr': 1.5e-1, ########1.5e-6
+    'lr': 1.5e-6,
     'warmup': 0.2, 
     'train_size': len(master_dm.train_dataloader()),
     'weight_decay': 0.001,
-    'n_epochs': 1          #######20     
+    'n_epochs': 20     
   }
 
   checkpoint_callback = ModelCheckpoint(
