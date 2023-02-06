@@ -6,7 +6,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from EDA import *
 from experts_modules import *
-from new_master_modules import *
+from master_modules import *
 
 
 
