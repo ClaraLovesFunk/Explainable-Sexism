@@ -3,6 +3,7 @@ from sklearn.metrics import f1_score
 import numpy as np
 from sklearn.metrics import accuracy_score
 from pytorch_lightning.callbacks import ModelCheckpoint
+from transformers import set_seed #######NEW
 
 from EDA import *
 from master_modules import *
@@ -24,6 +25,7 @@ if __name__ == "__main__":
   data_path = 'data/train_all_tasks.csv'
   expert_model_path = 'expert_models'
   master_model_path = 'master_models'
+  seed = 0
 
 
 
@@ -65,7 +67,7 @@ if __name__ == "__main__":
   for i in range(2):
     full_experts.append(Expert_Classifier(config_expert))
     full_experts[i] = Expert_Classifier(config_expert) 
-    full_experts[i].load_state_dict(torch.load(f'{expert_model_path}/{expert_name[i]}_bal_{exp_bal_train}.pt'))
+    full_experts[i].load_state_dict(torch.load(f'{expert_model_path}/{expert_name[i]}_bal_{exp_bal_train}_seed-{seed}.pt')) ####### CHANGE THIS, 
     experts.append(AutoModel.from_pretrained(expert_id[i]))
     finetuned_dict.append(full_experts[i].state_dict())
     model_dict.append(experts[i].state_dict())
@@ -108,14 +110,14 @@ if __name__ == "__main__":
   if train_master_flag == True: 
     master_clf = Master_Classifier(config_master,config_expert)
     trainer.fit(master_clf, master_dm)
-    torch.save(master_clf.state_dict(),f'{master_model_path}/master-{expert_name[0]}-{expert_name[1]}-bal_{exp_bal_train}.pt')
+    torch.save(master_clf.state_dict(),f'{master_model_path}/master-{expert_name[0]}-{expert_name[1]}-bal_{exp_bal_train}_seed-{seed}.pt')
   
 
 
   # TESTING
   if test_master_flag == True:   
     master_clf = Master_Classifier(config_master,config_expert)                                          
-    master_clf.load_state_dict(torch.load(f'{master_model_path}/master-{expert_name[0]}-{expert_name[1]}-bal_{exp_bal_train}.pt')) 
+    master_clf.load_state_dict(torch.load(f'{master_model_path}/master-{expert_name[0]}-{expert_name[1]}-bal_{exp_bal_train}_seed-{seed}.pt')) 
     master_clf.eval()
 
     # get predictions and turn to array

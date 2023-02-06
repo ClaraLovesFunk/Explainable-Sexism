@@ -9,6 +9,7 @@ import torch.nn as nn
 import math
 import torch.nn.functional as F 
 from torchmetrics.classification import MulticlassF1Score
+from transformers import set_seed #######NEW
 
 
 
@@ -66,7 +67,7 @@ class Expert_Dataset(Dataset):
 
 class Expert_DataModule(pl.LightningDataModule):
 
-  def __init__(self, model_id, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128, sample=False):     
+  def __init__(self, model_id, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128, sample=True):     
     super().__init__()        
     self.X_train = X_train
     self.X_test = X_test
@@ -103,8 +104,12 @@ class Expert_DataModule(pl.LightningDataModule):
 
 class Expert_Classifier(pl.LightningModule):
 
-  def __init__(self, config: dict):
+  def __init__(self, config: dict, seed = 0): #########seed = 0 ADDED
     super().__init__()
+    
+    self.seed = seed      ########### ADDED
+    set_seed(seed)    ########### ADDED
+    
     self.config = config
     self.pretrained_model = AutoModel.from_pretrained(config['model_name'], return_dict = True)
     #self.hidden = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.pretrained_model.config.hidden_size)
@@ -114,6 +119,8 @@ class Expert_Classifier(pl.LightningModule):
     self.loss_func = nn.BCEWithLogitsLoss(reduction='mean') 
     self.dropout = nn.Dropout()
     self.f1_func = MulticlassF1Score(num_classes = self.config['n_labels']) 
+
+    
     
   def forward(self, input_ids, attention_mask, labels=None):
     # roberta layer
