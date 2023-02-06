@@ -26,7 +26,6 @@ class Expert_Dataset(Dataset):
 
     if self.sample:                          
 
-      #label_none = self.data.loc[self.data['none']==1] ##### CONNECT WITH ATTRIBUTES FROM EDA
       label_derogation = self.data.loc[self.data['1. threats, plans to harm and incitement']==1] 
       label_animosity = self.data.loc[self.data['2. derogation']==1]
       label_threats = self.data.loc[self.data['3. animosity']==1]
@@ -108,7 +107,7 @@ class Expert_Classifier(pl.LightningModule):
     super().__init__()
     self.config = config
     self.pretrained_model = AutoModel.from_pretrained(config['model_name'], return_dict = True)
-    self.hidden = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.pretrained_model.config.hidden_size)
+    #self.hidden = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.pretrained_model.config.hidden_size)
     self.classifier = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.config['n_labels'])
     self.soft = torch.nn.Softmax(dim=1)
     torch.nn.init.xavier_uniform_(self.classifier.weight) 
@@ -122,9 +121,9 @@ class Expert_Classifier(pl.LightningModule):
     pooled_output = torch.mean(output.last_hidden_state, 1) 
     # final logits
     pooled_output = self.dropout(pooled_output)
-    pooled_output = self.hidden(pooled_output)
-    pooled_output = F.relu(pooled_output)
-    pooled_output = self.dropout(pooled_output)
+    #pooled_output = self.hidden(pooled_output)
+    #pooled_output = F.relu(pooled_output)
+    #pooled_output = self.dropout(pooled_output)
     logits = self.classifier(pooled_output)
     logits = self.soft(logits)
     # calculate loss and f1
