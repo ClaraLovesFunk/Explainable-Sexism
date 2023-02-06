@@ -6,7 +6,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from EDA import *
 from experts_modules import *
-from master_modules import *
+from master_modules import * 
 
 
 
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     'GroNLP/hateBERT': 'hateBERT', 
     'bert-base-uncased': 'BERT_base_uncased',
     }
-  train_balanced = [True, False]      
+  train_balanced = [True] ##########, False]      
 
   #######################################################################################
   #####################################   HYPS   ########################################
@@ -56,11 +56,11 @@ if __name__ == "__main__":
         'model_name': model_id,
         'n_labels': len(attributes), 
         'batch_size': 1,                 
-        'lr': 1.5e-6,          
+        'lr': 1.5e-1,        #####1.5e-6,          
         'warmup': 0.2, 
         'train_size': len(full_expert_dm.train_dataloader()),
         'weight_decay': 0.001,
-        'n_epochs': 20      
+        'n_epochs': 1 ############ 20      
       }
 
       checkpoint_callback = ModelCheckpoint(
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         max_epochs=config['n_epochs'],                                  
         gpus=1, 
         num_sanity_val_steps=50,
-        callbacks=[checkpoint_callback]
+        #callbacks=[checkpoint_callback]
         )
 
       
@@ -106,8 +106,8 @@ if __name__ == "__main__":
 
       results_by_balancing[b] = perf_metrics
     results_by_fullExpert[model_dict[model_id]] = results_by_balancing
-  np.save('results.npy', results_by_fullExpert) 
-  results = np.load('results.npy',allow_pickle='TRUE').item()
+  np.save('results_experts.npy', results_by_fullExpert) 
+  results = np.load('results_experts.npy',allow_pickle='TRUE').item()
   
   for model_id in model_dict: 
     print('-----------------------------------------------------------')
