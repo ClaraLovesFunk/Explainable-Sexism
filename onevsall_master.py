@@ -1,15 +1,51 @@
 import math
 import torch
 import numpy as np
-import pandas as pd
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
+from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import AdamW
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer
 from transformers import get_cosine_schedule_with_warmup
 from torchmetrics.classification import MulticlassF1Score
+from pytorch_lightning.loggers import TensorBoardLogger
+
+def train_master(df, config, doTrain=False, doTest=False):
+    df_train, df_test = train_test_split(df, test_size=0.2)
+    dm = MasterDataModule(df_train, df_test, model_name=config['hf_model_name'])
+    dm.setup()
+        
+    config['train_size'] = len(dm.train_dataloader())
+    config['model_filename'] = f"master_b{config['batch_size']}_e{config['n_epochs']}"
+
+    model = MasterClassifier(config)
+    
+    logger = TensorBoardLogger(save_dir=config['log_dir'], name=config['model_filename'])
+    trainer = pl.Trainer(
+                max_epochs=config['n_epochs'],
+                accelerator='gpu',
+                devices=1,
+                num_sanity_val_steps=15,
+                default_root_dir=config['root_dir'],
+                logger=logger,
+                enable_checkpointing=False,
+                )
+
+    if not doTrain:
+        ckpt = torch.load(f"{config['save_dir']}/{config['model_filename']}.pt")
+        model.load_state_dict(ckpt)
+    else:
+        trainer.fit(model, dm)
+        torch.save(model.state_dict(), f"{config['save_dir']}/{config['model_filename']}.pt")
+
+    if doTest:
+        model.eval()
+        test_dataloader = dm.test_dataloader()
+        trainer.test(model, dataloaders=test_dataloader)
+
+    return model
 
 class MasterDataset(Dataset):
 
@@ -20,7 +56,7 @@ class MasterDataset(Dataset):
         self._prepare_data()
 
     def _prepare_data(self):
-        for i in range(5):
+        for i in range(4):
             self.data[f'{i}'] = np.where(self.data['label'] == i, 1, 0)
 
     def __len__(self):
@@ -29,7 +65,7 @@ class MasterDataset(Dataset):
     def __getitem__(self, index):
         item = self.data.iloc[index]
         text = str(item.text)
-        labels = torch.FloatTensor([item[f'{i}'] for i in range(5)])
+        labels = torch.FloatTensor([item[f'{i}'] for i in range(4)])
         tokens = self.tokenizer.encode_plus(text,
                                             add_special_tokens=True,
                                             return_tensors='pt',
@@ -80,7 +116,9 @@ class MasterClassifier(pl.LightningModule):
         self.experts = self.config['experts']
         for exp in self.experts:
             exp.to(device)
-            exp.eval()
+            # exp.eval()
+            for param in exp.parameters():
+                param.requires_grad = False
 
         self.hidden = torch.nn.Linear(
                 self.experts[0].config.hidden_size*self.config['n_labels'],
@@ -92,7 +130,7 @@ class MasterClassifier(pl.LightningModule):
         torch.nn.init.xavier_uniform_(self.classifier.weight)
         self.dropout = nn.Dropout()
 
-        self.loss_func = nn.BCEWithLogitsLoss(reduction='mean')
+        self.loss_func = nn.CrossEntropyLoss()
         self.f1_func = MulticlassF1Score(num_classes=self.config['n_labels'])
         print('init done')
         
@@ -109,10 +147,7 @@ class MasterClassifier(pl.LightningModule):
         output3 = self.experts[3](input_ids=input_ids, attention_mask=attention_mask)
         pooled_output3 = torch.mean(output3.last_hidden_state, 1)
 
-        output4 = self.experts[4](input_ids=input_ids, attention_mask=attention_mask)
-        pooled_output4 = torch.mean(output4.last_hidden_state, 1)
-
-        pooled_output = torch.cat((pooled_output0, pooled_output1, pooled_output2, pooled_output3, pooled_output4), 1)
+        pooled_output = torch.cat((pooled_output0, pooled_output1, pooled_output2, pooled_output3), 1)
 
         # final logits
         output = self.dropout(pooled_output)
@@ -120,15 +155,15 @@ class MasterClassifier(pl.LightningModule):
         output = F.relu(output)
         output = self.dropout(output)
         logits = self.classifier(output)
-        logits = self.soft(logits)
+        outputs = self.soft(logits)
 
         # calculate loss and f1
         loss = 0
         f1 = 0
         if labels is not None:
-            loss = self.loss_func(logits, labels)
-            f1 = self.f1_func(logits, labels)
-        return loss, f1, logits
+            loss = self.loss_func(outputs, labels)
+            f1 = self.f1_func(torch.argmax(outputs, dim=1), torch.argmax(labels, dim=1))
+        return loss, f1, outputs
     
     def training_step(self, batch, batch_index):
         loss, f1, outputs = self(**batch)
