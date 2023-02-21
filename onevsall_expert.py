@@ -3,9 +3,7 @@ import torch
 import numpy as np
 import pandas as pd
 import torch.nn as nn
-import torch.nn.functional as F
 import pytorch_lightning as pl
-from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import AdamW
 from transformers import AutoModel, AutoTokenizer
@@ -13,42 +11,55 @@ from transformers import get_cosine_schedule_with_warmup
 from torchmetrics.classification import MulticlassF1Score
 from pytorch_lightning.loggers import TensorBoardLogger
 
-def train_experts(df, config, doTrain=False, doTest=False):
+
+def preproc_df(df, label, num_classes):
+    new_map = {i: 0 for i in range(num_classes)}
+    new_map[label] = 1
+    binary_df = df.copy(deep=True)
+    binary_df['label'].replace(new_map, inplace=True)
+    return binary_df
+
+
+def train_experts(df_train, df_dev, df_test, config, doTrain=False, doTest=False):
     expert_models = []
     for label in range(config['num_classes']):
-        new_map = {i:0 for i in range(config['num_classes'])}
-        new_map[label] = 1
-        binary_df = df.copy(deep=True)
-        binary_df['label'].replace(new_map, inplace=True)
-        
-        df_train, df_test = train_test_split(binary_df, test_size=0.2)
-        dm = ExpertDataModule(df_train, df_test, balance=config['balance'])
+        proc_df_train = preproc_df(df_train, label, config['num_classes'])
+        proc_df_dev = preproc_df(df_dev, label, config['num_classes'])
+        proc_df_test = preproc_df(df_test, label, config['num_classes'])
+
+        dm = ExpertDataModule(
+            proc_df_train,
+            proc_df_dev,
+            proc_df_test,
+            batch_size=config['batch_size'],
+            balance=config['balance'],
+            model_name=config['hf_model_name']
+        )
         dm.setup()
 
         config['train_size'] = len(dm.train_dataloader())
         config['model_filename'] = f"{config['expert_type']}{label}_bal{config['balance']}_b{config['batch_size']}_e{config['n_epochs']}"
-        
+
         expert_model = ExpertClassifier(config)
-        
+
         logger = TensorBoardLogger(save_dir=config['log_dir'], name=config['model_filename'])
         trainer = pl.Trainer(
-                max_epochs=config['n_epochs'],
-                accelerator='gpu',
-                devices=1,
-                num_sanity_val_steps=15,
-                default_root_dir=config['root_dir'],
-                logger=logger,
-                enable_checkpointing=False,
-                )
+            max_epochs=config['n_epochs'],
+            accelerator='gpu',
+            devices=1,
+            num_sanity_val_steps=15,
+            default_root_dir=config['root_dir'],
+            logger=logger,
+            enable_checkpointing=False,
+        )
 
-        if not doTrain:
-            ckpt = torch.load(f"{config['save_dir']}/{config['model_filename']}.pt")
-            expert_model.load_state_dict(ckpt)
-            expert_models.append(expert_model)
-        else:
+        if doTrain:
             trainer.fit(expert_model, dm)
             torch.save(expert_model.state_dict(), f"{config['save_dir']}/{config['model_filename']}.pt")
-            expert_models.append(expert_model)
+
+        ckpt = torch.load(f"{config['save_dir']}/{config['model_filename']}.pt")
+        expert_model.load_state_dict(ckpt)
+        expert_models.append(expert_model)
 
         if doTest:
             expert_model.eval()
@@ -56,6 +67,8 @@ def train_experts(df, config, doTrain=False, doTest=False):
             trainer.test(expert_model, dataloaders=test_dataloader)
 
     return expert_models
+
+
 class ExpertDataset(Dataset):
 
     def __init__(self, df, tokenizer, max_token_len: int = 128, balance=False):
@@ -67,12 +80,12 @@ class ExpertDataset(Dataset):
 
     def _prepare_data(self):
         if self.balance:
-            binary_class = self.data[self.data['label']==1]
-            binary_notClass = self.data[self.data['label']==0]
-            
+            binary_class = self.data[self.data['label'] == 1]
+            binary_notClass = self.data[self.data['label'] == 0]
+
             if len(binary_class) > len(binary_notClass):
                 self.data = pd.concat([binary_notClass, binary_class.sample(len(binary_notClass), random_state=0)])
-            else: 
+            else:
                 self.data = pd.concat([binary_class, binary_notClass.sample(len(binary_class), random_state=0)])
 
         self.data['class'] = np.where(self.data['label'] == 1, 1, 0)
@@ -91,40 +104,42 @@ class ExpertDataset(Dataset):
                                             truncation=True,
                                             padding='max_length',
                                             max_length=self.max_token_len,
-                                            return_attention_mask = True
+                                            return_attention_mask=True
                                             )
         return {'input_ids': tokens.input_ids.flatten(), 'attention_mask': tokens.attention_mask.flatten(), 'labels': labels}
 
 
 class ExpertDataModule(pl.LightningDataModule):
 
-    def __init__(self, train_df, val_df, batch_size: int = 16, max_token_length: int = 128,  model_name='roberta-base', balance=False):
+    def __init__(self, df_train, df_dev, df_test, batch_size, max_token_length: int = 128, model_name='roberta-base', balance=False):
         super().__init__()
-        self.train_df = train_df
-        self.val_df = val_df
+        self.df_train = df_train
+        self.df_dev = df_dev
+        self.df_test = df_test
         self.batch_size = batch_size
         self.max_token_length = max_token_length
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.balance = balance
 
-    def setup(self, stage = None):
+    def setup(self, stage=None):
         if stage in (None, "fit"):
-            self.train_dataset = ExpertDataset(self.train_df, tokenizer=self.tokenizer, balance=self.balance)
-            self.val_dataset = ExpertDataset(self.val_df, tokenizer=self.tokenizer)
+            self.train_dataset = ExpertDataset(self.df_train, tokenizer=self.tokenizer, balance=self.balance)
+            self.dev_dataset = ExpertDataset(self.df_dev, tokenizer=self.tokenizer)
+            self.test_dataset = ExpertDataset(self.df_test, tokenizer=self.tokenizer)
         if stage == 'predict':
-            self.val_dataset = ExpertDataset(self.val_df, tokenizer=self.tokenizer)
+            self.test_dataset = ExpertDataset(self.df_test, tokenizer=self.tokenizer)
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size = self.batch_size, num_workers=4, shuffle=True)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=4, shuffle=True)
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
+        return DataLoader(self.dev_dataset, batch_size=self.batch_size, num_workers=4, shuffle=False)
 
     def test_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
+        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=4, shuffle=False)
 
     def predict_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size = self.batch_size, num_workers=4, shuffle=False)
+        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=4, shuffle=False)
 
 
 class ExpertClassifier(pl.LightningModule):
@@ -132,7 +147,7 @@ class ExpertClassifier(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
-        self.pretrained_model = AutoModel.from_pretrained(config['hf_model_name'], return_dict = True)
+        self.pretrained_model = AutoModel.from_pretrained(config['hf_model_name'], return_dict=True)
         self.classifier = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.config['n_labels'])
         self.soft = torch.nn.Softmax(dim=1)
 
@@ -141,7 +156,7 @@ class ExpertClassifier(pl.LightningModule):
 
         self.loss_func = nn.BCELoss()
         self.f1_func = MulticlassF1Score(num_classes=self.config['n_labels'])
-        
+
     def forward(self, input_ids, attention_mask, labels=None):
         output = self.pretrained_model(input_ids=input_ids, attention_mask=attention_mask)
         pooled_output = torch.mean(output.last_hidden_state, 1)
@@ -156,34 +171,33 @@ class ExpertClassifier(pl.LightningModule):
             loss = self.loss_func(outputs, labels)
             f1 = self.f1_func(torch.argmax(outputs, dim=1), torch.argmax(labels, dim=1))
         return loss, f1, outputs
-    
+
     def training_step(self, batch, batch_index):
         loss, f1, outputs = self(**batch)
-        self.log("train f1 ", f1, prog_bar = True, logger=True)
-        self.log("train loss ", loss, prog_bar = True, logger=True)
-        return {"loss":loss, "train f1":f1, "predictions":outputs, "labels": batch["labels"]}
-    
+        self.log("train f1 ", f1, prog_bar=True, logger=True)
+        self.log("train loss ", loss, prog_bar=True, logger=True)
+        return {"loss": loss, "train f1": f1, "predictions": outputs, "labels": batch["labels"]}
+
     def validation_step(self, batch, batch_index):
         loss, f1, outputs = self(**batch)
-        self.log("val f1", f1, prog_bar = True, logger=True)
-        self.log("val loss ", loss, prog_bar = True, logger=True)
-        return {"val_loss": loss, "val f1":f1, "predictions":outputs, "labels": batch["labels"]}
-    
+        self.log("val f1", f1, prog_bar=True, logger=True)
+        self.log("val loss ", loss, prog_bar=True, logger=True)
+        return {"val_loss": loss, "val f1": f1, "predictions": outputs, "labels": batch["labels"]}
+
     def test_step(self, batch, batch_index):
         loss, f1, outputs = self(**batch)
-        self.log("test f1", f1, prog_bar = True, logger=True)
-        self.log("test loss ", loss, prog_bar = True, logger=True)
-        return {"loss":loss, "test f1":f1, "predictions":outputs, "labels": batch["labels"]}
+        self.log("test f1", f1, prog_bar=True, logger=True)
+        self.log("test loss ", loss, prog_bar=True, logger=True)
+        return {"loss": loss, "test f1": f1, "predictions": outputs, "labels": batch["labels"]}
 
     def predict_step(self, batch, batch_index):
         _, _, outputs = self(**batch)
         return outputs
 
-    
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.config['lr'], weight_decay=self.config['weight_decay'])
-        total_steps = self.config['train_size']/self.config['batch_size']
+        total_steps = self.config['train_size'] / self.config['batch_size']
         warmup_steps = math.floor(total_steps * self.config['warmup'])
         warmup_steps = math.floor(total_steps * self.config['warmup'])
         scheduler = get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps)
-        return [optimizer],[scheduler]
+        return [optimizer], [scheduler]
