@@ -124,6 +124,9 @@ class Master_Classifier(pl.LightningModule):
     self.expert1.eval()
 
     self.hidden = torch.nn.Linear(self.expert.config.hidden_size+self.expert1.config.hidden_size, 512) 
+    self.hidden2 = torch.nn.Linear(512, 512) 
+    self.hidden3 = torch.nn.Linear(512, 512) 
+
     self.classifier = torch.nn.Linear(512, self.config_master['n_labels']) 
     self.soft = torch.nn.Softmax(dim=1)
     torch.nn.init.xavier_uniform_(self.classifier.weight) 
@@ -145,7 +148,17 @@ class Master_Classifier(pl.LightningModule):
     pooled_output = self.dropout(pooled_output)
     pooled_output = self.hidden(pooled_output)
     pooled_output = F.relu(pooled_output)
+    #pooled_output = self.dropout(pooled_output) 
+
     pooled_output = self.dropout(pooled_output)
+    pooled_output = self.hidden2(pooled_output)
+    pooled_output = F.relu(pooled_output)
+
+    pooled_output = self.dropout(pooled_output)
+    pooled_output = self.hidden3(pooled_output)
+    pooled_output = F.relu(pooled_output)
+
+
     logits = self.classifier(pooled_output)
     logits = self.soft(logits)
     # calculate loss and f1
