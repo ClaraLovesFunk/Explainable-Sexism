@@ -17,7 +17,7 @@ if __name__ == "__main__":
   #####################################   FLAGS   #######################################
   #######################################################################################
   
-  train_expert_flag = True
+  train_expert_flag = True 
 
   #######################################################################################
   ############################   VALUES TO ITERATE OVER   ###############################
@@ -27,14 +27,14 @@ if __name__ == "__main__":
     'GroNLP/hateBERT': 'hateBERT', 
     'bert-base-uncased': 'BERT_base_uncased',
     }
-  train_balanced = [True] ##########, False] 
-  seeds = [0] ##########, 1]     
+  train_balanced = [True]########## ##########, False] 
+  seeds = [0,1] ##########, 1]     
 
   #######################################################################################
   #####################################   HYPS   ########################################
   #######################################################################################
 
-  data_path = 'data/train_all_tasks.csv'
+  data_path = 'data/edos_labelled_individual_annotations.csv'
   model_path = 'expert_models'
 
   results_by_fullExpert = {}
@@ -51,8 +51,15 @@ if __name__ == "__main__":
 
         data, attributes = load_arrange_data(data_path)
 
-        X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) 
-        
+        #X_train, X_test, y_train, y_test = train_test_split(data['split'=='train'], data['label_category'], test_size = 0.2, random_state = 0) 
+        X_train = data.loc[(data['split'] != 'test')]
+        y_train = data.loc[(data['split'] != 'test')]['label_category']
+
+        X_test = data.loc[(data['split'] == 'test')]
+        y_test = data.loc[(data['split'] == 'test')]['label_category']
+
+
+
         full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) 
         full_expert_dm.setup()
         
@@ -61,11 +68,11 @@ if __name__ == "__main__":
           'model_name': model_id,
           'n_labels': len(attributes), 
           'batch_size': 1,                 
-          'lr': 1.5e-1,        #####1.5e-6,          
+          'lr': 1.5e-6,          
           'warmup': 0.2, 
           'train_size': len(full_expert_dm.train_dataloader()),
           'weight_decay': 0.001,
-          'n_epochs': 1    #############20      
+          'n_epochs': 50      
         }
 
         checkpoint_callback = ModelCheckpoint(
@@ -117,7 +124,7 @@ if __name__ == "__main__":
   for model_id in model_dict: 
     print('-----------------------------------------------------------')
     print('-----------------------------------------------------------')
-    print(f'     {model_name}')
+    print(f'     {model_dict[model_id]}')
     print(f'\n')
     for b in train_balanced:
       print(f'bal-{b}:')
