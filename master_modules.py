@@ -9,7 +9,7 @@ import torch.nn as nn
 import math
 import torch.nn.functional as F 
 from torchmetrics.classification import MulticlassF1Score
-from transformers import set_seed #######NEW
+from transformers import set_seed 
 
 
 
@@ -70,8 +70,8 @@ class Master_DataModule(pl.LightningDataModule):
   def __init__(self, model_id, X_train, X_test, attributes, batch_size: int = 16, max_token_length: int = 128, sample=True, seed = 0):     
     super().__init__() 
     
-    self.seed = seed      ########### ADDED
-    set_seed(seed)    ########### ADDED
+    self.seed = seed       
+    set_seed(seed)    
          
     self.X_train = X_train
     self.X_test = X_test
@@ -114,7 +114,7 @@ class Master_Classifier(pl.LightningModule):
     self.config_expert = config_expert
 
     device = torch.device("cuda")
-    self.expert = self.config_master['experts'][0]       ########## MAKE SEXY LOOP
+    self.expert = self.config_master['experts'][0]       
     self.expert1 = self.config_master['experts'][1]
 
     self.expert.to(device)
@@ -123,9 +123,8 @@ class Master_Classifier(pl.LightningModule):
     self.expert.eval()
     self.expert1.eval()
 
-    #self.pretrained_model = AutoModel.from_pretrained(config['model_name'], return_dict = True) ######## DO TWO CONFIGS FOR BERT AND FOR HATEBERT
-    self.hidden = torch.nn.Linear(self.expert.config.hidden_size+self.expert1.config.hidden_size, 512) #############self.expert.config.hidden_size (connect to config_master)
-    self.classifier = torch.nn.Linear(512, self.config_master['n_labels']) ########self.expert.config.hidden_size (same as above)
+    self.hidden = torch.nn.Linear(self.expert.config.hidden_size+self.expert1.config.hidden_size, 512) 
+    self.classifier = torch.nn.Linear(512, self.config_master['n_labels']) 
     self.soft = torch.nn.Softmax(dim=1)
     torch.nn.init.xavier_uniform_(self.classifier.weight) 
     self.loss_func = nn.BCEWithLogitsLoss(reduction='mean') 
@@ -134,7 +133,7 @@ class Master_Classifier(pl.LightningModule):
     
   def forward(self, input_ids, attention_mask, labels=None):
     # roberta layer
-    output0 = self.expert(input_ids=input_ids, attention_mask=attention_mask)  ###### MAKE LOOP
+    output0 = self.expert(input_ids=input_ids, attention_mask=attention_mask)  
     pooled_output0 = torch.mean(output0.last_hidden_state, 1)
 
     output1 = self.expert1(input_ids=input_ids, attention_mask=attention_mask)
