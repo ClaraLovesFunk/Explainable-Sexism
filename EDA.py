@@ -14,7 +14,7 @@ def load_arrange_data(data_path):
   for k in labels:
     data[k] = np.where(data['label_category'] == k, 1, 0)
     
-  label_map = {                                      ####### REINDEXED
+  label_map = {                                      
     'none': 4,
     '1. threats, plans to harm and incitement' : 0,
     '2. derogation': 1,
@@ -25,11 +25,8 @@ def load_arrange_data(data_path):
   data['label_category'].replace(label_map, inplace=True) 
   
   # drop instances with no sexism in train data since no sexism is not regarded as a class in the semeval task
-  data.drop(data.loc[data['label_category']==4].index, inplace=True) ##### CHANGED TO 4
+  data.drop(data.loc[data['label_category']==4].index, inplace=True) 
   
   
   return data, labels
 
-#data, attributes = load_arrange_data('data/test_task_b_entries.csv', True)
-#data.drop(data['text'], inplace=True, axis=1)
-#display(data)

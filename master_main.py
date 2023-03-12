@@ -3,7 +3,7 @@ from sklearn.metrics import f1_score
 import numpy as np
 from sklearn.metrics import accuracy_score
 from pytorch_lightning.callbacks import ModelCheckpoint
-from transformers import set_seed #######NEW
+from transformers import set_seed 
 
 from EDA import *
 from master_modules import *
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     'bert-base-uncased': 'BERT_base_uncased',
     }
   
-  data_path = 'data/edos_labelled_individual_annotations.csv'        #train_all_tasks.csv'
+  data_path = 'data/edos_labelled_individual_annotations.csv'        
   expert_model_path = 'expert_models'
   master_model_path = 'master_models'
   seed_master = 0
@@ -42,15 +42,13 @@ if __name__ == "__main__":
     # PREPARE DATA
     data, attributes = load_arrange_data(data_path)
 
-    #X_train, X_test, y_train, y_test = train_test_split(data, data['label_category'], test_size = 0.2, random_state = 0) ######## IF SEED = 0 SAME SPLIT AS EXPERTS
     X_train = data.loc[(data['split'] != 'test')]
     y_train = data.loc[(data['split'] != 'test')]['label_category']
 
     X_test = data.loc[(data['split'] == 'test')]
     y_test = data.loc[(data['split'] == 'test')]['label_category']
-    
 
-    master_dm = Master_DataModule(expert_id[0], X_train, X_test, attributes=attributes, sample = exp_bal_train) ###### MAKE EXPERT MODULE1 AND 2
+    master_dm = Master_DataModule(expert_id[0], X_train, X_test, attributes=attributes, sample = exp_bal_train) 
     master_dm.setup()
 
 
@@ -58,7 +56,7 @@ if __name__ == "__main__":
     # LOADING EXPERTS AND CUTTING OFF HIDDEN LAYER AND CLASSIFICATION HEAD
 
     config_expert = {
-      'model_name': expert_id[0],            ###### CURRENTLY STILL NECESSARY FOR EXPERT MODULE
+      'model_name': expert_id[0],            
       'model_name1': expert_id[1],
       'experts': expert_id,
       'n_labels': len(attributes), 
@@ -79,10 +77,7 @@ if __name__ == "__main__":
       full_experts.append(Expert_Classifier(config_expert))
       full_experts[i] = Expert_Classifier(config_expert) 
 
-      
-        #full_experts[i].load_state_dict(torch.load(f'{expert_model_path}/{expert_name[i]}_bal_{exp_bal_train}_seed-{seed_experts[i]}.pt'))
       full_experts[i].load_state_dict(torch.load(f'{expert_model_path}/{expert_name[i]}_bal_{exp_bal_train}_seed-{i}.pt')) 
-      
 
       experts.append(AutoModel.from_pretrained(expert_id[i]))
       finetuned_dict.append(full_experts[i].state_dict())
@@ -117,7 +112,6 @@ if __name__ == "__main__":
       max_epochs=config_master['n_epochs'], 
       gpus=1, 
       num_sanity_val_steps=50,
-      #callbacks=[checkpoint_callback]
       )
     
 

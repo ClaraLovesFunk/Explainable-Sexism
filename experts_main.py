@@ -3,7 +3,7 @@ from sklearn.metrics import f1_score
 import numpy as np
 from sklearn.metrics import accuracy_score
 from pytorch_lightning.callbacks import ModelCheckpoint
-from transformers import set_seed ######NEW
+from transformers import set_seed 
 
 from EDA import *
 from experts_modules import *
@@ -27,8 +27,8 @@ if __name__ == "__main__":
     'GroNLP/hateBERT': 'hateBERT', 
     'bert-base-uncased': 'BERT_base_uncased',
     }
-  train_balanced = [True]########## ##########, False] 
-  seeds = [0,1] ##########, 1]     
+  train_balanced = [True] 
+  seeds = [0,1]      
 
   #######################################################################################
   #####################################   HYPS   ########################################
@@ -50,15 +50,12 @@ if __name__ == "__main__":
         model_name = model_dict[model_id]
 
         data, attributes = load_arrange_data(data_path)
-
-        #X_train, X_test, y_train, y_test = train_test_split(data['split'=='train'], data['label_category'], test_size = 0.2, random_state = 0) 
+        
         X_train = data.loc[(data['split'] != 'test')]
         y_train = data.loc[(data['split'] != 'test')]['label_category']
 
         X_test = data.loc[(data['split'] == 'test')]
         y_test = data.loc[(data['split'] == 'test')]['label_category']
-
-
 
         full_expert_dm = Expert_DataModule(model_id, X_train, X_test, attributes=attributes, sample = b) 
         full_expert_dm.setup()
@@ -86,7 +83,6 @@ if __name__ == "__main__":
           max_epochs=config['n_epochs'],                                  
           gpus=1, 
           num_sanity_val_steps=50,
-          #callbacks=[checkpoint_callback]
           )
 
         
@@ -132,7 +128,7 @@ if __name__ == "__main__":
       for s in seeds:
         print('-----------------------------------------------------------')
         print(f'seed-{s}:')
-        print(results[model_dict[model_id]][b][s]['f1-macro_avrg']) #f'f1: ', 
-        print(results[model_dict[model_id]][b][s]['f1-no_avrg']) #f'f1: ', 
-        print(results[model_dict[model_id]][b][s]['acc']) #f'acc: ', 
+        print(results[model_dict[model_id]][b][s]['f1-macro_avrg'])  
+        print(results[model_dict[model_id]][b][s]['f1-no_avrg'])  
+        print(results[model_dict[model_id]][b][s]['acc']) 
         print('\n')

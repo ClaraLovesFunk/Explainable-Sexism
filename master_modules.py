@@ -148,7 +148,6 @@ class Master_Classifier(pl.LightningModule):
     pooled_output = self.dropout(pooled_output)
     pooled_output = self.hidden(pooled_output)
     pooled_output = F.relu(pooled_output)
-    #pooled_output = self.dropout(pooled_output) 
 
     pooled_output = self.dropout(pooled_output)
     pooled_output = self.hidden2(pooled_output)

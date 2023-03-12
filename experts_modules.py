@@ -9,7 +9,7 @@ import torch.nn as nn
 import math
 import torch.nn.functional as F 
 from torchmetrics.classification import MulticlassF1Score
-from transformers import set_seed #######NEW
+from transformers import set_seed 
 
 
 
@@ -104,15 +104,14 @@ class Expert_DataModule(pl.LightningDataModule):
 
 class Expert_Classifier(pl.LightningModule):
 
-  def __init__(self, config: dict, seed = 0): #########seed = 0 ADDED
+  def __init__(self, config: dict, seed = 0): 
     super().__init__()
     
-    self.seed = seed      ########### ADDED
-    set_seed(seed)    ########### ADDED
+    self.seed = seed      
+    set_seed(seed)    
     
     self.config = config
     self.pretrained_model = AutoModel.from_pretrained(config['model_name'], return_dict = True)
-    #self.hidden = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.pretrained_model.config.hidden_size)
     self.classifier = torch.nn.Linear(self.pretrained_model.config.hidden_size, self.config['n_labels'])
     self.soft = torch.nn.Softmax(dim=1)
     torch.nn.init.xavier_uniform_(self.classifier.weight) 
@@ -128,9 +127,6 @@ class Expert_Classifier(pl.LightningModule):
     pooled_output = torch.mean(output.last_hidden_state, 1) 
     # final logits
     pooled_output = self.dropout(pooled_output)
-    #pooled_output = self.hidden(pooled_output)
-    #pooled_output = F.relu(pooled_output)
-    #pooled_output = self.dropout(pooled_output)
     logits = self.classifier(pooled_output)
     logits = self.soft(logits)
     # calculate loss and f1
