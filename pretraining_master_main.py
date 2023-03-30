@@ -6,8 +6,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from transformers import set_seed 
 
 from EDA import *
-from master_modules import *
-from experts_modules import *
+from pretraining_master_modules import *
+from pretraining_experts_modules import *
 
 
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
       'warmup': 0.2, 
       'train_size': len(master_dm.train_dataloader()),
       'weight_decay': 0.001,
-      'n_epochs': 100      
+      'n_epochs': 50      
     }
 
     full_experts = [] 
@@ -98,7 +98,7 @@ if __name__ == "__main__":
       'warmup': 0.2, 
       'train_size': len(master_dm.train_dataloader()),
       'weight_decay': 0.001,
-      'n_epochs': 100     
+      'n_epochs': 50     
     }
 
     checkpoint_callback = ModelCheckpoint(
