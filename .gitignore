@@ -7,3 +7,5 @@ experts_by_pretraining_models/
 core/
 expert_models/
 master_models/
+.idea/
+.ipynb_checkpoints/
