@@ -1,6 +1,7 @@
 ckpts/
 data/
 starting_kit/
+saved_models/
 lightning_logs/
 UCC_data/
 experts_by_pretraining_models/
@@ -9,3 +10,4 @@ expert_models/
 master_models/
 .idea/
 .ipynb_checkpoints/
+venv/
