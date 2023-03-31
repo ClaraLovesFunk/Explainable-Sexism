@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import pytorch_lightning as pl
+from sklearn.model_selection import train_test_split
 from transformers import AutoModel
 from onevsall_expert import train_experts
 from onevsall_master import train_master, MasterDataModule
@@ -42,7 +43,7 @@ def get_preds(model, model_name, df_train, df_test):
     return df_test
 
 
-def preproc_data(data_path, label_map):
+def preproc_data(data_path, label_map, onlyTrainSet=False):
     df = pd.read_csv(data_path)
     df.drop(df.loc[df['label_category'] == 'none'].index, axis=0, inplace=True)
     label_map = {
@@ -55,9 +56,13 @@ def preproc_data(data_path, label_map):
     df['label_category'].replace(label_map, inplace=True)
     df.rename(columns={'label_category': 'label'}, inplace=True)
 
-    df_train = df[df['split'] == 'train']
-    df_dev = df[df['split'] == 'dev']
-    df_test = df[df['split'] == 'test']
+    if onlyTrainSet:
+        df_train, df_dev = train_test_split(df[df['split'] == 'train'], test_size=0.2, random_state=0)
+        df_test = df_dev.copy(deep=True)
+    else:
+        df_train = df[df['split'] == 'train']
+        df_dev = df[df['split'] == 'dev']
+        df_test = df[df['split'] == 'test']
 
     return df_train, df_dev, df_test
 
@@ -71,7 +76,7 @@ if __name__ == "__main__":
         '4. prejudiced discussions': 3
     }
 
-    df_train, df_dev, df_test = preproc_data(data_path, label_map)
+    df_train, df_dev, df_test = preproc_data(data_path, label_map, onlyTrainSet=True)
     num_classes = len(np.unique(df_train['label']))
 
     expert_config = {
@@ -80,12 +85,12 @@ if __name__ == "__main__":
         'expert_type': 'hatebert',
         'num_classes': num_classes,
         'n_labels': 2,
-        'batch_size': 16,
+        'batch_size': 1,
         'balance': 1,
         'lr': 3e-4,
         'warmup': 0.2,
         'weight_decay': 0.001,
-        'n_epochs': 25,
+        'n_epochs': 10,
         'root_dir': os.getcwd(),
         'save_dir': "onevsall_models",
         'log_dir': 'lightning_logs/'
@@ -113,16 +118,16 @@ if __name__ == "__main__":
         'hf_model_name': "GroNLP/hateBERT",
         'n_labels': num_classes,
         'experts': experts,
-        'batch_size': 16,
+        'batch_size': 8,
         'lr': 3e-4,
         'warmup': 0.2,
         'weight_decay': 0.001,
-        'n_epochs': 100,
+        'n_epochs': 250,
         'root_dir': os.getcwd(),
         'save_dir': "onevsall_models",
         'log_dir': 'lightning_logs/'
     }
-    master = train_master(df_train, df_dev, df_test, master_config, doTrain=True, doTest=True)
+    master = train_master(df_train, df_dev, df_test, master_config, doTrain=False, doTest=True)
 
     # #dev
     # test1 = pd.read_csv('project/Explainable-Sexism/data/dev_task_b_entries.csv')
