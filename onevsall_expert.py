@@ -31,7 +31,7 @@ def train_experts(df_train, df_dev, df_test, config, doTrain=False, doTest=False
             proc_df_train,
             proc_df_dev,
             proc_df_test,
-            batch_size=config['batch_size'],
+            # batch_size=config['batch_size'],
             balance=config['balance'],
             model_name=config['hf_model_name']
         )
@@ -111,7 +111,7 @@ class ExpertDataset(Dataset):
 
 class ExpertDataModule(pl.LightningDataModule):
 
-    def __init__(self, df_train, df_dev, df_test, batch_size, max_token_length: int = 128, model_name='roberta-base', balance=False):
+    def __init__(self, df_train, df_dev, df_test, batch_size=16, max_token_length=128, model_name='roberta-base', balance=False):
         super().__init__()
         self.df_train = df_train
         self.df_dev = df_dev

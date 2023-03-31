@@ -23,7 +23,7 @@ def train_master(df_train, df_dev, df_test, config, doTrain=False, doTest=False)
     dm.setup()
 
     config['train_size'] = len(dm.train_dataloader())
-    config['model_filename'] = f"master_b{config['batch_size']}_e{config['n_epochs']}"
+    config['model_filename'] = f"master_b{config['batch_size']}_e{config['n_epochs']}_nodrop"
 
     model = MasterClassifier(config)
 
@@ -85,7 +85,7 @@ class MasterDataset(Dataset):
 
 class MasterDataModule(pl.LightningDataModule):
 
-    def __init__(self, df_train, df_dev, df_test, batch_size, max_token_length: int = 128, model_name='roberta-base'):
+    def __init__(self, df_train, df_dev, df_test, batch_size=16, max_token_length: int = 128, model_name='roberta-base'):
         super().__init__()
         self.df_train = df_train
         self.df_dev = df_dev
@@ -140,6 +140,22 @@ class MasterClassifier(pl.LightningModule):
             self.experts[0].config.hidden_size,
             512,
         )
+        self.hidden4 = torch.nn.Linear(
+            self.experts[0].config.hidden_size,
+            512,
+        )
+        self.hidden5 = torch.nn.Linear(
+            self.experts[0].config.hidden_size,
+            512,
+        )
+        self.hidden6 = torch.nn.Linear(
+            self.experts[0].config.hidden_size,
+            512,
+        )
+        self.hidden7 = torch.nn.Linear(
+            self.experts[0].config.hidden_size,
+            512,
+        )
         self.classifier = torch.nn.Linear(
             512,
             self.config['n_labels']
@@ -172,10 +188,8 @@ class MasterClassifier(pl.LightningModule):
         # final logits
         output = self.hidden(pooled_output)
         output = F.relu(output)
-        output = self.dropout(output)
         output = self.hidden2(output)
         output = F.relu(output)
-        output = self.dropout(output)
         output = self.hidden3(output)
         output = F.relu(output)
         output = self.dropout(output)
