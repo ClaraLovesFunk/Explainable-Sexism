@@ -4,8 +4,8 @@ import numpy as np
 import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 from transformers import AutoModel
-from onevsall_expert import train_experts
-from onevsall_master import train_master, MasterDataModule
+from moce_experts_module import train_experts
+from moce_master_module import train_master, MasterDataModule
 
 
 def get_preds(model, model_name, df_train, df_test):
@@ -76,7 +76,9 @@ if __name__ == "__main__":
         '4. prejudiced discussions': 3
     }
 
-    df_train, df_dev, df_test = preproc_data(data_path, label_map, onlyTrainSet=True)
+    df_train, df_dev, df_test = preproc_data(data_path, label_map, onlyTrainSet=False)
+    print(df_train['label'].value_counts())
+    print(df_test['label'].value_counts())
     num_classes = len(np.unique(df_train['label']))
 
     expert_config = {
